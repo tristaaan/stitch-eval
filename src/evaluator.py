@@ -7,6 +7,7 @@ from imageio import imread, imwrite
 from im_split import im_split
 from feature_based.AKAZE import AKAZE
 
+
 def eval_method(image, original, method, **kwargs):
   blocks = im_split(image, **kwargs)
   start = time()
@@ -15,6 +16,7 @@ def eval_method(image, original, method, **kwargs):
   result = evaluation2(stitched, original)
   print("t: %0.2f, a: %0.2f" % (duration, result))
   return (duration, result)
+
 
 def run_eval(image, method):
   cname = method.__name__
@@ -29,9 +31,15 @@ def run_eval(image, method):
   for rot in range(0,181,45):
     print('rotation: %d' % rot)
     duration, result = eval_method(image, orig, method, rotation=rot)
-    noise_table = noise_table.append({'time': duration, cname: result}, ignore_index=True)
+    rot_table = noise_table.append({'time': duration, cname: result}, ignore_index=True)
 
-  return (noise_table, rot_table)
+  overlap_table = pd.DataFrame(columns=['time', cname])
+  for p in [o/100 for o in range(0, 50, 5)]:
+    print('overlap: %d' % p)
+    duration, result = eval_method(image, orig, method, overlap=p)
+    overlap_table = noise_table.append({'time': duration, cname: result}, ignore_index=True)
+
+  return (noise_table, rot_table, overlap_table)
 
 
 def pad_image(stitched, target_size):
@@ -77,6 +85,7 @@ def evaluation2(stitched, original):
   return nom
 
 if __name__ == '__main__':
-  x = run_eval('../data/T1_Img_002.00.tif', AKAZE)
+  x = run_eval('../data/S2_Img_003.00.tif', AKAZE)
   print(x[0])
   print(x[1])
+  print(x[2])
