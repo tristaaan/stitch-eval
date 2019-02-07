@@ -17,29 +17,28 @@ def eval_method(image, original, method, **kwargs):
   print("t: %0.2f, a: %0.2f" % (duration, result))
   return (duration, result)
 
+def eval_param(image, method, param, data_range):
+  table = pd.DataFrame(columns=['noise', 'time', cname])
+    for db in data_range:
+      duration, result = eval_method(image, orig, method, noise=db)
+      noise_table = noise_table.append(
+        {param: db, 'time': duration, cname: result}, ignore_index=True)
+  return table
 
-def run_eval(image, method):
+def run_eval(image, method, noise=True, rotation=True, overlap=True):
   cname = method.__name__
   orig = imread(image)
-  noise_table = pd.DataFrame(columns=['time', cname])
-  for db in [d / 100 for d in range(0,11,2)]:
-    print('db: %f' % db)
-    duration, result = eval_method(image, orig, method, noise=db)
-    noise_table = noise_table.append({'time': duration, cname: result}, ignore_index=True)
+  out = []
+  if noise:
+    out.append(eval_param(image, method, 'noise', [d / 100 for d in range(0,11,2)]))
 
-  rot_table = pd.DataFrame(columns=['time', cname])
-  for rot in range(0,181,45):
-    print('rotation: %d' % rot)
-    duration, result = eval_method(image, orig, method, rotation=rot)
-    rot_table = noise_table.append({'time': duration, cname: result}, ignore_index=True)
+  if rotation:
+    out.append(eval_param(image, method, 'rotation', range(0,181,45)))
 
-  overlap_table = pd.DataFrame(columns=['time', cname])
-  for p in [o/100 for o in range(0, 50, 5)]:
-    print('overlap: %d' % p)
-    duration, result = eval_method(image, orig, method, overlap=p)
-    overlap_table = noise_table.append({'time': duration, cname: result}, ignore_index=True)
+  if overlap:
+    out.append(eval_param(image, method, 'overlap', [o/100 for o in range(0, 50, 5)]))
 
-  return (noise_table, rot_table, overlap_table)
+  return out
 
 
 def pad_image(stitched, target_size):
