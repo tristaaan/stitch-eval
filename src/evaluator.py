@@ -1,3 +1,4 @@
+import argparse
 import numpy as np
 import pandas as pd
 
@@ -17,18 +18,27 @@ def eval_method(image, original, method, **kwargs):
   print("t: %0.2f, a: %0.2f" % (duration, result))
   return (duration, result)
 
+
 def eval_param(image, method, param, data_range):
   table = pd.DataFrame(columns=['noise', 'time', cname])
-    for db in data_range:
-      duration, result = eval_method(image, orig, method, noise=db)
-      noise_table = noise_table.append(
-        {param: db, 'time': duration, cname: result}, ignore_index=True)
+  for val in data_range:
+    duration, result = eval_method(image, orig, method, noise=val)
+    table = table.append(
+      {param: val, 'time': duration, cname: result}, ignore_index=True)
   return table
 
-def run_eval(image, method, noise=True, rotation=True, overlap=True):
+
+def run_eval(image, method, noise=False, rotation=False, overlap=False):
+  # if no arguments are provided all are run.
+  if not (noise and rotation and overlap):
+    noise = True
+    rotation = True
+    overlap = True
+
   cname = method.__name__
   orig = imread(image)
   out = []
+
   if noise:
     out.append(eval_param(image, method, 'noise', [d / 100 for d in range(0,11,2)]))
 
@@ -84,7 +94,13 @@ def evaluation2(stitched, original):
   return nom
 
 if __name__ == '__main__':
-  x = run_eval('../data/S2_Img_003.00.tif', AKAZE)
-  print(x[0])
-  print(x[1])
-  print(x[2])
+  parser = argparse.ArgumentParser(description='Run evaluations with a method')
+  parser.add_argument('-noise', metavar='n', type=str, help='run noise evaluations')
+  parser.add_argument('-rotation', metavar='r', type=str, help='run rotation evaluations')
+  parser.add_argument('-overlap', metavar='o', type=str, help='run overlap evaluations')
+  args = parser.parse_args()
+  kw = {'noise': args.n, 'rotation': args.r, 'overlap': args.o }
+  print(kw)
+  x = run_eval('../data/S2_Img_003.00.tif', AKAZE, **kw)
+  for t in x:
+    print(t)
