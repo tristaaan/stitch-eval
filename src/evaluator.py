@@ -1,4 +1,5 @@
 import argparse
+import random
 import numpy as np
 import pandas as pd
 
@@ -7,11 +8,13 @@ from imageio import imread, imwrite
 from im_split import im_split
 from feature_based.AKAZE import AKAZE
 
+def clamp_uint16(val):
+  return min(val, (2**16)-1)
 
 def eval_method(image, original, method, **kwargs):
   blocks = im_split(image, **kwargs)
   stitched, duration = method(blocks)
-  result = evaluation(stitched, original)
+  result = random_evaluation(stitched, original)
   return (duration, result)
 
 
@@ -23,7 +26,7 @@ def eval_param(image, method, param, data_range):
   for val in data_range:
     kw = { param: val }
     duration, result = eval_method(image, orig, method, **kw)
-    print("param: %0.02f, t: %0.2f, a: %0.2f" % (val, duration, result))
+    print("param: %0.02f, t: %0.2f, a: %0.2f" % (val, duration, result*100))
     table = table.append(
       {param: val, 'time': duration, cname: result}, ignore_index=True)
   return table
@@ -90,6 +93,26 @@ def evaluation2(stitched, original):
   differents = stitched[:roi_H,:roi_W] - original[:roi_H,:roi_W]
   nom = differents.sum() / total_px
   return nom
+
+def random_evaluation(stitched, original):
+  '''
+  Take random windowed samples between the two images. Avoid the upper-left quad
+  '''
+  stitched, max_y, max_x = pad_image(stitched, original.shape)
+  iters = 2000;
+  diffs = 0
+  for i in range(0,iters):
+    y_quad = int(random.random() > 0.5)
+    x_quad = int(random.random() > 0.5)
+    while x_quad + y_quad == 0:
+      y_quad = int(random.random() > 0.5)
+      x_quad = int(random.random() > 0.5)
+    r_y = random.randint((max_y / 2) * y_quad, max_y-1)
+    r_x = random.randint((max_x / 2) * x_quad, max_x-1)
+    diffs += abs(int(stitched[r_y, r_x]) - int(original[r_y, r_x]))
+    diffs = clamp_uint16(diffs)
+
+  return diffs / (iters * ((2**16)-1))
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Run evaluations with a method')

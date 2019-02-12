@@ -42,15 +42,15 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0):
             # print("%d:%d , %d:%d" % (r_start, r_end, c_start, c_end))
             block = im[r_start:r_end,c_start:c_end]
             # Do not transform the first block.
-            if r+c == 0:
-                output_images.append(block)
-                continue
             if noise > 0:
                 mean = 0.0
                 std = noise
                 block = skimage.util.random_noise(block, mode='gaussian', mean=mean, var=std)
                 block *= (2**16)-1               # scale pixels back to 0..65535
                 block = block.astype('uint16')   # cast back to uint16
+            if r+c == 0:
+                output_images.append(block)
+                continue
             if rotation > 0:
                 block = imutils.rotate_bound(block, np.random.randint(-45,45))
 
