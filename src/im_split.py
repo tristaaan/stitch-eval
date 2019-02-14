@@ -17,7 +17,7 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0):
     '''
     assert(blocks > 1)
     assert(math.sqrt(blocks).is_integer())
-    assert(overlap >= 0 and overlap < 1)
+    assert(overlap >= 0 and overlap <= 1)
 
     im = imageio.imread('../data/%s' % fname)
 
@@ -25,34 +25,33 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0):
     width = im.shape[0]
     height = im.shape[1]
 
-    offset_w = (width / rows * overlap/2)
-    output_w = (width / rows) + offset_w
-
-    offset_h = (height / rows * overlap/2)
-    output_h = (height / rows) + offset_h
+    ratio = 1 / ((1/overlap) + (rows-1))
+    output_w = height * ratio*2
+    offset = output_w * overlap
+    output_h = output_w
 
     output_images = []
-
+    # print('b:%d o:%d' % (output_w, offset))
     for r in range(rows):
-        r_start = int(max(output_w * r - offset_w * (r+1), 0))
-        r_end   = int(min(output_w * (r+1), height))
+        r_start = int(max(output_w * r - offset * r, 0))
+        r_end   = int(min(r_start + output_w, height))
         for c in range(rows):
-            c_start = int(max(output_h * c - offset_h * (c+1), 0))
-            c_end   = int(min(output_h * (c+1), width))
+            c_start = int(max(output_w * c - offset * c, 0))
+            c_end   = int(min(c_start + output_w, width))
             # print("%d:%d , %d:%d" % (r_start, r_end, c_start, c_end))
             block = im[r_start:r_end,c_start:c_end]
             # Do not transform the first block.
+            if r+c == 0:
+                output_images.append(block)
+                continue
             if noise > 0:
                 mean = 0.0
                 std = noise
                 block = skimage.util.random_noise(block, mode='gaussian', mean=mean, var=std)
                 block *= (2**16)-1               # scale pixels back to 0..65535
                 block = block.astype('uint16')   # cast back to uint16
-            if r+c == 0:
-                output_images.append(block)
-                continue
             if rotation > 0:
-                block = imutils.rotate_bound(block, np.random.randint(-45,45))
+                block = imutils.rotate_bound(block, rotation)
 
             output_images.append(block)
 

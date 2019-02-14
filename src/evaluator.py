@@ -1,4 +1,5 @@
 import argparse
+import math
 import random
 import numpy as np
 import pandas as pd
@@ -14,7 +15,7 @@ def clamp_uint16(val):
 def eval_method(image, original, method, **kwargs):
   blocks = im_split(image, **kwargs)
   stitched, duration = method(blocks)
-  result = random_evaluation(stitched, original)
+  result = i_RMSE(stitched, original)
   return (duration, result)
 
 
@@ -113,6 +114,14 @@ def random_evaluation(stitched, original):
     diffs = clamp_uint16(diffs)
 
   return diffs / (iters * ((2**16)-1))
+
+def i_RMSE(stitched, original):
+  stitched, ow, oh = pad_image(stitched, original.shape)
+  total_px = ow * oh
+  stitched = stitched.astype('float64') / (2**16 -1)
+  original = original.astype('float64') / (2**16 -1)
+  abs_err = abs(original - stitched) ** 2
+  return math.sqrt((1/total_px) * abs_err.sum())
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Run evaluations with a method')
