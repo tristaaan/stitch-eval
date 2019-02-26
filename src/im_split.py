@@ -16,9 +16,9 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, **kwargs):
     percentage overlap between the blocks, for example, if `p=0.2` 20% of an image will
     be common with its neighboring image.
     '''
-    assert(blocks > 1)
-    assert(math.sqrt(blocks).is_integer())
-    assert(overlap >= 0 and overlap <= 1)
+    assert blocks > 1, 'blocks must be greater than one'
+    assert math.sqrt(blocks).is_integer(), '√blocks must be a whole integer'
+    assert overlap >= 0 and overlap <= 1, 'overlap must be in the range 0...1'
 
     im = imageio.imread('%s' % fname)
 
