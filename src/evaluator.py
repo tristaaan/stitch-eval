@@ -128,8 +128,12 @@ if __name__ == '__main__':
   parser.add_argument('-noise', action='store_true', help='run noise evaluations')
   parser.add_argument('-rotation', action='store_true', help='run rotation evaluations')
   parser.add_argument('-overlap', action='store_true', help='run overlap evaluations')
+  parser.add_argument('-file', '-f', help='image filename', type=str, default='../data/T1_Img_002.00.tif')
+  # todo
+  # parser.add_argument('-method', '-m', help='method to evaluate', type=str, default='akaze')
+
   args = parser.parse_args()
   kw = vars(args)
-  x = run_eval('../data/S2_Img_003.00.tif', AKAZE, **kw)
+  x = run_eval(kw['file'], AKAZE, **kw)
   for t in x:
     print(t)

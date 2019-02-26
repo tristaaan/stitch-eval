@@ -1,3 +1,4 @@
+import argparse
 import math    # sqrt
 import imageio # imread, imwrite
 import imutils # image rotate bounds
@@ -8,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 
 
-def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0):
+def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, **kwargs):
     '''
     Takes an image `im` and optionally a parameter `blocks` to determine how many blocks it should
     be split into. `blocks` must be a square number greater than 1. Overlap determines the
@@ -19,7 +20,7 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0):
     assert(math.sqrt(blocks).is_integer())
     assert(overlap >= 0 and overlap <= 1)
 
-    im = imageio.imread('../data/%s' % fname)
+    im = imageio.imread('%s' % fname)
 
     rows = int(math.sqrt(blocks))
     width = im.shape[0]
@@ -93,7 +94,7 @@ def plot_blocks(imgs, bars=False):
     plt.show()
 
 
-def write_ims(ims, prefix, rotation=False, noise=False):
+def write_ims(ims, prefix, rotation=False, noise=False, **kwargs):
     flags = ''
     if rotation:
         flags += '_rot'
@@ -103,16 +104,16 @@ def write_ims(ims, prefix, rotation=False, noise=False):
         imageio.imwrite('../data/%s_segment%s_%d.tif' % (prefix, flags, ind+1), im[:, :])
 
 if __name__ == '__main__':
-    fname = 'T1_Img_002.00.tif'
-    blocks = 4
-    overlap = 0.2
-    imgs_no_rot    = im_split(fname, blocks=blocks, overlap=overlap)
-    imgs_noise     = im_split(fname, blocks=blocks, overlap=overlap,                noise=True)
-    imgs_rot       = im_split(fname, blocks=blocks, overlap=overlap, rotation=True)
-    imgs_rot_noise = im_split(fname, blocks=blocks, overlap=overlap, rotation=True, noise=True)
-
-    write_ims(imgs_no_rot, fname.split('_')[0])
-    write_ims(imgs_noise, fname.split('_')[0], noise=True)
-    write_ims(imgs_rot, fname.split('_')[0], rotation=True)
-    write_ims(imgs_rot_noise, fname.split('_')[0], rotation=True, noise=True)
-
+    parser = argparse.ArgumentParser(description='Split an image into blocks' \
+                                            + 'with some overlap, rotation,'  \
+                                            + 'and/or noise')
+    parser.add_argument('-noise', '-n', help='add noise', type=float, default=0)
+    parser.add_argument('-rotation', '-r', help='add rotation', type=int, default=0)
+    parser.add_argument('-overlap', '-o', help='overlap percentage [0...1]', type=float, default=0.2)
+    parser.add_argument('-blocks', '-b', help='number of blocks, must be a square number', type=int, default=4)
+    parser.add_argument('-file', '-f', help='image filename', type=str, default='../data/T1_Img_002.00.tif')
+    args = parser.parse_args()
+    kw = vars(args)
+    fname = kw['file']
+    imgs = im_split(fname, **kw)
+    write_ims(imgs, fname.split('_')[0], **kw)
