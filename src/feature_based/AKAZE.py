@@ -9,13 +9,12 @@ from imageio import imread, imwrite
 from math import floor
 from time import time
 
+
 def get_akaze_keypoints(im):
     akaze = cv2.AKAZE_create()
     return akaze.detectAndCompute(im, None)
 
-
 def AKAZE(blocks):
-    feature_points = []
     bf = cv2.BFMatcher()
     queue = deque(blocks)
     base = queue.popleft()
