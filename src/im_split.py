@@ -21,23 +21,39 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, **kwargs):
     assert overlap >= 0 and overlap <= 1, 'overlap must be in the range 0...1'
 
     im = imageio.imread('%s' % fname)
-
     rows = int(math.sqrt(blocks))
     width = im.shape[0]
     height = im.shape[1]
 
-    ratio = 1 / ((1/overlap) + (rows-1))
-    output_w = height * ratio*2
-    offset = output_w * overlap
-    output_h = output_w
+    stride = None
+    output_w = 0
+    output_h = 0
+
+    # for some reason these two methods of splitting an image stop working at 0.5
+    if overlap < 0.5:
+        base_block = width / rows
+        overlap_p = base_block * overlap
+        output_w = base_block + overlap_p
+        output_h = output_w # assumes image is square
+        offset = overlap_p
+        stride = base_block - overlap_p
+    else:
+        ratio = 1 / ((1/overlap) + (rows-1))
+        output_w = height * ratio*2
+        offset = output_w * overlap
+        output_h = output_w # assumes image is square
 
     output_images = []
     # print('b:%d o:%d' % (output_w, offset))
     for r in range(rows):
         r_start = int(max(output_w * r - offset * r, 0))
+        if stride != None:
+            r_start = int(max(stride * r, 0))
         r_end   = int(min(r_start + output_w, height))
         for c in range(rows):
             c_start = int(max(output_w * c - offset * c, 0))
+            if stride != None:
+                c_start = int(max(stride * c, 0))
             c_end   = int(min(c_start + output_w, width))
             # print("%d:%d , %d:%d" % (r_start, r_end, c_start, c_end))
             block = im[r_start:r_end,c_start:c_end]
