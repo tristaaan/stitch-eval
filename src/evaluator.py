@@ -7,10 +7,10 @@ import pandas as pd
 from imageio import imread, imwrite
 
 from im_split import im_split
-from feature_based.AKAZE import AKAZE
+from AKAZE import AKAZE
+from Fourier import Fourier
+from util import clamp_uint16
 
-def clamp_uint16(val):
-  return min(val, (2**16)-1)
 
 def eval_method(image, original, method, **kwargs):
   blocks = im_split(image, **kwargs)
@@ -33,7 +33,7 @@ def eval_param(image, method, param, data_range):
   return table
 
 
-def run_eval(image, method, noise=False, rotation=False, overlap=False):
+def run_eval(image, method, noise=False, rotation=False, overlap=False, **kwargs):
   # if no arguments are provided all are run.
   if not noise and not rotation and not overlap:
     noise    = True
@@ -68,53 +68,6 @@ def pad_image(stitched, target_size):
   return (stitched, tw, th)
 
 
-def evaluation(stitched, original):
-  '''
-  Sum absolute difference
-  '''
-  stitched, ow, oh = pad_image(stitched, original.shape)
-  total_px = ow * oh
-  differents = np.count_nonzero(original - stitched[:oh,:ow])
-
-  # percent the same
-  return (total_px - differents) / total_px
-
-
-def evaluation2(stitched, original):
-  '''
-  https://user.engineering.uiowa.edu/~n-morph/research/invert_and_trans/node3.html#eq:aic_error
-  It is important to define a ROI because the amount of padding applied to the image data can have
-  a significant effect on the average error calculation. The ROI restricts the error measurements
-  to areas of interest preventing the situation where the largest error occurs in the background
-  of the image.
-  '''
-  stitched, ow, oh = pad_image(stitched, original.shape)
-  roi_H, roi_W = (int(oh * 0.95), int(ow * 0.95))
-  total_px = roi_H * roi_W
-  differents = stitched[:roi_H,:roi_W] - original[:roi_H,:roi_W]
-  nom = differents.sum() / total_px
-  return nom
-
-def random_evaluation(stitched, original):
-  '''
-  Take random windowed samples between the two images. Avoid the upper-left quad
-  '''
-  stitched, max_y, max_x = pad_image(stitched, original.shape)
-  iters = 2000;
-  diffs = 0
-  for i in range(0,iters):
-    y_quad = int(random.random() > 0.5)
-    x_quad = int(random.random() > 0.5)
-    while x_quad + y_quad == 0:
-      y_quad = int(random.random() > 0.5)
-      x_quad = int(random.random() > 0.5)
-    r_y = random.randint((max_y / 2) * y_quad, max_y-1)
-    r_x = random.randint((max_x / 2) * x_quad, max_x-1)
-    diffs += abs(int(stitched[r_y, r_x]) - int(original[r_y, r_x]))
-    diffs = clamp_uint16(diffs)
-
-  return diffs / (iters * ((2**16)-1))
-
 def i_RMSE(stitched, original):
   stitched, ow, oh = pad_image(stitched, original.shape)
   total_px = ow * oh
@@ -123,17 +76,24 @@ def i_RMSE(stitched, original):
   abs_err = abs(original - stitched) ** 2
   return math.sqrt((1/total_px) * abs_err.sum())
 
+
+def method_picker(name):
+  methods = [Fourier, AKAZE]
+  method_names = list(map(lambda x: x.__name__.lower(), methods))
+  return methods[method_names.index(name.lower())]
+
+
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Run evaluations with a method')
   parser.add_argument('-noise', action='store_true', help='run noise evaluations')
   parser.add_argument('-rotation', action='store_true', help='run rotation evaluations')
   parser.add_argument('-overlap', action='store_true', help='run overlap evaluations')
   parser.add_argument('-file', '-f', help='image filename', type=str, default='../data/T1_Img_002.00.tif')
-  # todo
-  # parser.add_argument('-method', '-m', help='method to evaluate', type=str, default='akaze')
+  parser.add_argument('-method', '-m', help='method to evaluate', type=str, default='akaze')
 
   args = parser.parse_args()
   kw = vars(args)
-  x = run_eval(kw['file'], AKAZE, **kw)
+  kw['method'] = method_picker(kw['method'])
+  x = run_eval(kw['file'], **kw)
   for t in x:
     print(t)
