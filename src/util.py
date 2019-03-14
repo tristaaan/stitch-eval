@@ -62,29 +62,40 @@ def crop_zeros(im, zero=0):
     '''
     Crop zeros around an image
     '''
-    r,c = im.shape
-    top = 0
-    left = 0
-    bottom = r-1
-    right = c-1
-    while sum(im[top,:]) == zero:
-        top += 1
-
-    while sum(im[bottom,:]) == zero:
-        bottom -=1
-
-    while sum(im[:,left]) == zero:
-        left +=1
-
-    while sum(im[:,right]) == zero:
-        right -=1
-
-    return im[top:bottom+1,left:right+1]
+    # get the coordinates of every point > zero
+    true_points = np.argwhere(im > zero)
+    tl = true_points.min(axis=0) # top left corner
+    br = true_points.max(axis=0) # bottom right corner
+    out = im[tl[0]:br[0]+1,
+             tl[1]:br[1]+1]
+    return out
 
 
 def clamp_uint16(val):
   return min(val, (2**16)-1)
 
+
+def equalize_image(stitched, target_size):
+    '''
+    crop or pad stitched to a target size
+    '''
+    sh, sw = stitched.shape
+    th, tw = target_size
+
+    nh, nw = (0,0)
+    if sw < tw:
+        nw = tw - sw
+    elif sw > tw:
+        stitched = stitched[:,:tw]
+
+    if sh < th:
+        nh = th - sh
+    elif sh > th:
+        stitched = stitched[:th,:]
+
+    if nw + nh > 0:
+        return np.pad(stitched, ((0, nh), (0, nw)), 'constant', constant_values=(0,0))
+    return stitched
 
 def bounds_equalize(target, ref):
     '''

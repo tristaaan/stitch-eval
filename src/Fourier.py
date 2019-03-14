@@ -122,7 +122,7 @@ def Fourier(blocks):
     total_time = 0
     while len(queue) > 0:
         # load images
-        im1 = base
+        im1 = base.copy()
         im2 = queue.popleft()
 
         if sum(im2.shape) > sum(im1.shape):
@@ -151,9 +151,9 @@ def Fourier(blocks):
 
         # rotate the moving image to the correct angle
         if angle != 0:
-            im2 = ndimage.rotate(im2, -angle, reshape=False)
+            im2 = ndimage.rotate(im2, -angle, reshape=False, order=2)
 
-        im2 = crop_zeros(im2)
+        im2 = crop_zeros(im2, zero=500)
         # find the x,y translation
         im2_orig = im2.copy()
         im2 = bounds_equalize(im1, im2)
@@ -172,7 +172,7 @@ def Fourier(blocks):
         print('stitched %d with %d' % (ind, ind + 1))
         ind += 1
 
-    base = crop_zeros(base)
+    base = crop_zeros(base, zero=100)
     imwrite('../data/stitched.tif', base)
     average_time = total_time / (len(blocks) - 1)
     return (base, average_time)
