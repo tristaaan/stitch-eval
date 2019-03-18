@@ -1,7 +1,7 @@
 import argparse
 import math    # sqrt
 import imageio # imread, imwrite
-import imutils # image rotate bounds
+import imutils # rotate, resize
 import skimage # noise
 
 import numpy as np
@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 
 
-def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, **kwargs):
+def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, **kwargs):
     '''
     Takes an image `im` and optionally a parameter `blocks` to determine how many blocks it should
     be split into. `blocks` must be a square number greater than 1. Overlap determines the
@@ -21,6 +21,8 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, **kwargs):
     assert overlap >= 0 and overlap <= 1, 'overlap must be in the range 0...1'
 
     im = imageio.imread('%s' % fname)
+    if downsample > 0:
+        im = imutils.resize(im, width=downsample)
     rows = int(math.sqrt(blocks))
     width = im.shape[0]
     height = im.shape[1]

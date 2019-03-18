@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from imageio import imread, imwrite
+from imutils import resize
 from operator import mul
 
 from im_split import im_split
@@ -15,6 +16,9 @@ from util import clamp_uint16, equalize_image
 
 def eval_method(image_name, method, **kwargs):
     original = imread(image_name)
+    if kwargs['downsample'] > 0:
+        original = resize(original, width=kwargs['downsample'])
+    print('orig shape: %s' % (original.shape,) )
     blocks = im_split(image_name, **kwargs)
     stitched, duration = method(blocks)
     acc_result = i_RMSE(stitched, original)
@@ -22,11 +26,11 @@ def eval_method(image_name, method, **kwargs):
     return (duration, acc_result, suc_result)
 
 
-def eval_param(image_name, method, param, data_range):
+def eval_param(image_name, method, param, data_range, downsample):
     table = pd.DataFrame(columns=[param, 'time', 'error', 'success'])
     print('%s evaluation with %s' % (param, method.__name__))
     for val in data_range:
-        kw = { param: val }
+        kw = { param: val, 'downsample': downsample }
         duration, err, suc = eval_method(image_name, method, **kw)
         print("param: %0.2f, t: %0.2f, err: %0.2f suc: %0.2f" % (val, duration, err, suc))
         table = table.append(
@@ -34,7 +38,8 @@ def eval_param(image_name, method, param, data_range):
     return table
 
 
-def run_eval(image_name, method, noise=False, rotation=False, overlap=False, **kwargs):
+def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
+             downsample=False, **kwargs):
     # if no arguments are provided all are run.
     if not noise and not rotation and not overlap:
         noise    = True
@@ -43,13 +48,16 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, **k
 
     out = []
     if noise:
-        out.append(eval_param(image_name, method, 'noise', [d / 100 for d in range(0,11,2)]))
+        dr = [d / 100 for d in range(0,11,2)]
+        out.append(eval_param(image_name, method, 'noise', dr, downsample))
 
     if rotation:
-        out.append(eval_param(image_name, method, 'rotation', range(0,181,45)))
+        dr = range(0,181,45)
+        out.append(eval_param(image_name, method, 'rotation', dr, downsample))
 
     if overlap:
-        out.append(eval_param(image_name, method, 'overlap', [o/100 for o in range(5, 51, 5)]))
+        dr = [o/100 for o in range(5, 51, 5)]
+        out.append(eval_param(image_name, method, 'overlap', dr, downsample))
         # out.append(eval_param(image_name, method, 'overlap', [0.3,0.35]))
 
     return out
@@ -90,11 +98,16 @@ def method_picker(name):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run evaluations with a method')
-    parser.add_argument('-noise', action='store_true', help='run noise evaluations')
+    # eval parameters
+    parser.add_argument('-noise',    action='store_true', help='run noise evaluations')
     parser.add_argument('-rotation', action='store_true', help='run rotation evaluations')
-    parser.add_argument('-overlap', action='store_true', help='run overlap evaluations')
-    parser.add_argument('-file', '-f', help='image filename', type=str, default='../data/T1_Img_002.00.tif')
-    parser.add_argument('-method', '-m', help='method to evaluate', type=str, default='akaze')
+    parser.add_argument('-overlap',  action='store_true', help='run overlap evaluations')
+
+    # other options
+    parser.add_argument('-file', '-f',       help='image filename', type=str,
+                        default='../data/T1_Img_002.00.tif')
+    parser.add_argument('-method', '-m',     help='method to evaluate', type=str, default='akaze')
+    parser.add_argument('-downsample', '-ds', help='downsample images', type=int, default='-1')
 
     args = parser.parse_args()
     kw = vars(args)
