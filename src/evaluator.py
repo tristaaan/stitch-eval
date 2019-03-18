@@ -18,7 +18,6 @@ def eval_method(image_name, method, **kwargs):
     original = imread(image_name)
     if kwargs['downsample'] > 0:
         original = resize(original, width=kwargs['downsample'])
-    print('orig shape: %s' % (original.shape,) )
     blocks = im_split(image_name, **kwargs)
     stitched, duration = method(blocks)
     acc_result = i_RMSE(stitched, original)
@@ -58,7 +57,6 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
     if overlap:
         dr = [o/100 for o in range(5, 51, 5)]
         out.append(eval_param(image_name, method, 'overlap', dr, downsample))
-        # out.append(eval_param(image_name, method, 'overlap', [0.3,0.35]))
 
     return out
 

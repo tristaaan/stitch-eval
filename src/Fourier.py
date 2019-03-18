@@ -14,14 +14,36 @@ from time import time
 from util import bounds_equalize, crop_zeros, eq_paste, tuple_sub
 
 
-def cross_power_spectrum(i1, i2):
+def norm_cross_power_spectrum(i1, i2):
     '''
-    normalized cross-power spectrum
+    normalized cross power spectrum, Faroosh et. al.
     '''
     assert i1.shape[0] == i2.shape[0] and i1.shape[1] == i2.shape[1], 'images are different sizes: %s v %s' % (i1.shape, i2.shape,)
     f1 = fft2(i1)
     f2 = fft2(i2)
     return (f1 * conj(f2)) / abs(f2 * conj(f2))
+
+def cross_power_spectrum(i1, i2):
+    '''
+    Cross power spectrum,
+    Image Mosaic Based on Phase Correlation and Harris Operator, F. Yang et al.
+    '''
+    assert i1.shape[0] == i2.shape[0] and i1.shape[1] == i2.shape[1], 'images are different sizes: %s v %s' % (i1.shape, i2.shape,)
+    f1 = fft2(i1)
+    f2 = fft2(i2)
+    return (f1 * conj(f2)) / abs(f1 * conj(f2))
+
+def phase_correlation(i1, i2):
+    '''
+    Image Alignment and Stitching: A Tutorial, R. Szeliski
+    "here the spectrum of the two signals is **whitened** by dividing each per frequency product
+    by the magnitudes of the Fourier transforms"
+    '''
+    assert i1.shape[0] == i2.shape[0] and i1.shape[1] == i2.shape[1], 'images are different sizes: %s v %s' % (i1.shape, i2.shape,)
+    f1 = fft2(i1)
+    f2 = fft2(i2)
+    return (f1 * conj(f2)) / (abs(f1) * abs(f2))
+
 
 def log_polar(img, radius=2.0):
     '''
@@ -30,6 +52,7 @@ def log_polar(img, radius=2.0):
     center = (img.shape[0] / 2, img.shape[1] / 2)
     radius = round(sqrt(center[0] ** radius + center[1] ** radius))
     return cv2.warpPolar(img, img.shape, center, radius, cv2.WARP_POLAR_LOG)
+
 
 def NCC(i1, i2):
     '''
@@ -43,6 +66,7 @@ def NCC(i1, i2):
     if sqrt(dnom) == 0:
         return 0
     return nom / sqrt(dnom)
+
 
 def test_corners(ref, mov, pt):
     '''
@@ -122,24 +146,23 @@ def Fourier(blocks):
     total_time = 0
     while len(queue) > 0:
         # load images
-        im1 = base.copy()
         im2 = queue.popleft()
 
-        if sum(im2.shape) > sum(im1.shape):
+        if sum(im2.shape) > sum(base.shape):
             # this will run on the first block if im2 is rotated
-            im1 = bounds_equalize(im2, im1)
+            base = bounds_equalize(im2, base)
         else:
-            im2 = bounds_equalize(im1, im2)
+            im2 = bounds_equalize(base, im2)
 
         # start timer
         start = time()
 
         # convert to log-polar coordinates
-        im1_p = log_polar(im1)
+        base_p = log_polar(base)
         im2_p = log_polar(im2)
 
         # find correlation
-        impulse = ifft2(cross_power_spectrum(im1_p, im2_p))
+        impulse = ifft2(phase_correlation(base_p, im2_p))
         theta, _ = np.unravel_index(np.argmax(impulse), impulse.shape)
 
         # calculate angle in degrees
@@ -156,8 +179,8 @@ def Fourier(blocks):
         im2 = crop_zeros(im2, zero=500)
         # find the x,y translation
         im2_orig = im2.copy()
-        im2 = bounds_equalize(im1, im2)
-        impulse = ifft2(cross_power_spectrum(im1, im2))
+        im2 = bounds_equalize(base, im2)
+        impulse = ifft2(cross_power_spectrum(base, im2))
         y,x = np.unravel_index(np.argmax(impulse), impulse.shape)
 
         # due to the padding we need to shift the x and y
@@ -166,8 +189,8 @@ def Fourier(blocks):
 
         # The corner to which this method matches can be ambiguous
         # find the matching corner and prepare the image to be pasted
-        im2 = prepare_paste(im1, im2_orig, nx, ny)
-        base = eq_paste(im1, im2)
+        im2 = prepare_paste(base, im2_orig, nx, ny)
+        base = eq_paste(base, im2)
         total_time += time() - start
         print('stitched %d with %d' % (ind, ind + 1))
         ind += 1
