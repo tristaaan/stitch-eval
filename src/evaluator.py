@@ -45,18 +45,18 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         rotation = True
         overlap  = True
 
-    out = []
+    out = {}
     if noise:
         dr = [d / 100 for d in range(0,11,2)]
-        out.append(eval_param(image_name, method, 'noise', dr, downsample))
+        out['noise'] = eval_param(image_name, method, 'noise', dr, downsample)
 
     if rotation:
         dr = range(0,181,45)
-        out.append(eval_param(image_name, method, 'rotation', dr, downsample))
+        out['rotation'] = eval_param(image_name, method, 'rotation', dr, downsample)
 
     if overlap:
         dr = [o/100 for o in range(5, 51, 5)]
-        out.append(eval_param(image_name, method, 'overlap', dr, downsample))
+        out['overlap'] = eval_param(image_name, method, 'overlap', dr, downsample)
 
     return out
 
@@ -106,10 +106,17 @@ if __name__ == '__main__':
                         default='../data/T1_Img_002.00.tif')
     parser.add_argument('-method', '-m',     help='method to evaluate', type=str, default='akaze')
     parser.add_argument('-downsample', '-ds', help='downsample images', type=int, default='-1')
+    parser.add_argument('-output', '-o', action='store_true', help='output results to LaTeX table')
 
     args = parser.parse_args()
     kw = vars(args)
-    kw['method'] = method_picker(kw['method'])
-    x = run_eval(kw['file'], **kw)
-    for t in x:
-        print(t)
+    method = kw['method']
+    kw['method'] = method_picker(method)
+    results = run_eval(kw['file'], **kw)
+    for k in results.keys():
+        print(results[k])
+        if kw['output']:
+            latex_str = results[k].to_latex(index=False)
+            with open('%s_%s.tex' % (method, k), 'w') as fi:
+                fi.write(latex_str)
+
