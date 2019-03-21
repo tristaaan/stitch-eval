@@ -118,5 +118,7 @@ if __name__ == '__main__':
         if kw['output']:
             latex_str = results[k].to_latex(index=False)
             with open('%s_%s.tex' % (method, k), 'w') as fi:
+                fi.write('\\begin{table}\n\\centering\n')
                 fi.write(latex_str)
-
+                fi.write('\\caption{%s results for %s method.}\n' % (k, method))
+                fi.write('\\end{table}\n')
