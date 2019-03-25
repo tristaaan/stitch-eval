@@ -58,7 +58,8 @@ def NCC(i1, i2):
     '''
     Normalized cross correlation, maximize this
     '''
-    assert sum(i1.shape) == sum(i2.shape), 'i1 and i2 are different shapes "%s" v "%s"' % (i1.shape, i2.shape,)
+    assert i1.shape == i2.shape, \
+           'i1 and i2 are different shapes "%s" v "%s"' % (i1.shape, i2.shape,)
     f_err = i1 - i1.mean()
     t_err = i2 - i2.mean()
     nom = (f_err * t_err).sum()
@@ -91,39 +92,90 @@ def test_corners(ref, mov, pt):
     ref_bl = ref[max(y-window,0):y,   x:min(x+window, rw)]
 
     # compare corners
-    if mul(*tl.shape) > 0 and mul(*tl.shape) == mul(*ref_tl.shape):
+    if mul(*tl.shape) > 0 and tl.shape == ref_tl.shape:
         corrs.append(NCC(ref_tl, tl))
     else:
         corrs.append(-1)
 
-    if mul(*tr.shape) > 0 and mul(*tr.shape) == mul(*ref_tr.shape):
+    if mul(*tr.shape) > 0 and tr.shape == ref_tr.shape:
         corrs.append(NCC(ref_tr, tr))
     else:
         corrs.append(-1)
 
-    if mul(*br.shape) > 0 and mul(*br.shape) == mul(*ref_br.shape):
+    if mul(*br.shape) > 0 and br.shape == ref_br.shape:
         corrs.append(NCC(ref_br, br))
     else:
         corrs.append(-1)
 
-    if mul(*bl.shape) > 0 and mul(*bl.shape) == mul(*ref_bl.shape):
+    if mul(*bl.shape) > 0 and bl.shape == ref_bl.shape:
         corrs.append(NCC(ref_bl, bl))
     else:
         corrs.append(-1)
 
     # return the best one
-    return np.argmax(corrs)
+    return np.argmax(corrs), max(corrs)
 
 
-def prepare_paste(i1,i2, x,y):
-    corner = test_corners(i1, i2, (y,x)) # tl, tr, bl, br
+def find_best_corner(i1, i2, old_shape, x,y):
+    '''
+    offset the x and y depending on which corner matches best
+    return new x, new y, corner
+    '''
+    corner_scores = []
+    corners = []
+    xys = []
+
+    # tl
+    ny = y+int((old_shape[0] - i2.shape[0])/2)
+    nx = x+int((old_shape[1] - i2.shape[1])/2)
+    c,cs = test_corners(i1, i2, (ny,nx))
+    corner_scores.append(cs)
+    corners.append(c)
+    xys.append((nx,ny))
+
+    # tr
+    ny = y-int((old_shape[0] - i2.shape[0])/2)
+    nx = x+int((old_shape[1] - i2.shape[1])/2)
+    c,cs = test_corners(i1, i2, (ny,nx))
+    corner_scores.append(cs)
+    corners.append(c)
+    xys.append((nx,ny))
+
+    # br
+    ny = y-int((old_shape[0] - i2.shape[0])/2)
+    nx = x-int((old_shape[1] - i2.shape[1])/2)
+    c,cs = test_corners(i1, i2, (ny,nx))
+    corner_scores.append(cs)
+    corners.append(c)
+    xys.append((nx,ny))
+
+    # bl
+    ny = y+int((old_shape[0] - i2.shape[0])/2)
+    nx = x-int((old_shape[1] - i2.shape[1])/2)
+    c,cs = test_corners(i1, i2, (ny,nx))
+    corner_scores.append(cs)
+    corners.append(c)
+    xys.append((nx,ny))
+
+    # tl, tr, bl, br
+    corner = corners[np.argmax(corner_scores)]
+    nx, ny = xys[np.argmax(corner_scores)]
+    return corner, nx, ny
+
+
+def prepare_paste(i1, i2, old_shape, x,y):
+    '''
+    Pad the image depending on which corner matches best with the image
+    The corner to which this method matches can be ambiguous
+    '''
+    corner, x, y = find_best_corner(i1, i2, old_shape, x, y)
     padded = None
     if corner == 0: # top left corner
-        row_p = y
-        col_p = x
+        row_p = abs(y)
+        col_p = abs(x)
         padded = np.pad(i2, ((row_p,0), (col_p,0)), 'constant', constant_values=(0,0))
     elif corner == 1: # top right corner
-        row_p = y
+        row_p = abs(y)
         col_p = max(i2.shape[1] - x, 0)
         padded = np.pad(i2, ((row_p,0), (0,col_p)), 'constant', constant_values=(0,0))
     elif corner == 2: # bottom right corner
@@ -132,7 +184,7 @@ def prepare_paste(i1,i2, x,y):
         padded = np.pad(i2, ((0,row_p), (0,col_p)), 'constant', constant_values=(0,0))
     elif corner == 3: # bottom left corner
         row_p = max(i2.shape[0] - y, 0)
-        col_p = x
+        col_p = abs(x)
         padded = np.pad(i2, ((0,row_p), (col_p,0)), 'constant', constant_values=(0,0))
     else:
         raise ValueError('This should never happen, corner=%d' % corner)
@@ -147,12 +199,7 @@ def Fourier(blocks):
     while len(queue) > 0:
         # load images
         im2 = queue.popleft()
-
-        if sum(im2.shape) > sum(base.shape):
-            # this will run on the first block if im2 is rotated
-            base = bounds_equalize(im2, base)
-        else:
-            im2 = bounds_equalize(base, im2)
+        base, im2 = bounds_equalize(base, im2)
 
         # start timer
         start = time()
@@ -174,22 +221,19 @@ def Fourier(blocks):
 
         # rotate the moving image to the correct angle
         if angle != 0:
-            im2 = ndimage.rotate(im2, -angle, reshape=False, order=2)
+            im2 = ndimage.rotate(im2, -angle, reshape=False)
 
         im2 = crop_zeros(im2, zero=500)
+        base = crop_zeros(base, zero=500)
         # find the x,y translation
         im2_orig = im2.copy()
-        im2 = bounds_equalize(base, im2)
-        impulse = ifft2(cross_power_spectrum(base, im2))
+        base, im2 = bounds_equalize(base, im2)
+        impulse = ifft2(phase_correlation(base, im2))
         y,x = np.unravel_index(np.argmax(impulse), impulse.shape)
 
-        # due to the padding we need to shift the x and y
-        ny = y+int((im2.shape[0] - im2_orig.shape[0])/2)
-        nx = x+int((im2.shape[1] - im2_orig.shape[1])/2)
-
-        # The corner to which this method matches can be ambiguous
-        # find the matching corner and prepare the image to be pasted
-        im2 = prepare_paste(base, im2_orig, nx, ny)
+        # prepare the image to be pasted
+        im2 = prepare_paste(base, im2_orig, im2.shape, x, y)
+        # paste
         base = eq_paste(base, im2)
         total_time += time() - start
         print('stitched %d with %d' % (ind, ind + 1))
