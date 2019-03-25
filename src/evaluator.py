@@ -29,7 +29,7 @@ def eval_method(image_name, method, **kwargs):
 
 def eval_param(image_name, method, param, data_range, downsample=False, overlap=0.2):
     row = []
-    print('%s evaluation with %s' % (param, method.__name__))
+    print('%s: %s, overlap: %0.2f' % (method.__name__, param, overlap))
     for val in data_range:
         kw = { param: val, 'downsample': downsample, }
         if param != 'overlap':
@@ -144,7 +144,11 @@ if __name__ == '__main__':
         if kw['output']:
             latex_str = results[k].to_latex()
             with open('%s_%s.tex' % (method, k), 'w') as fi:
+                caption = '%s results for %s method.' % (k, method)
+                if kw['downsample']:
+                    ds = kw['downsample']
+                    caption += ' Base image downsampled to $%d\\times%d$ pixels.' % (ds, ds)
                 fi.write('\\begin{table}\n\\centering\n')
                 fi.write(latex_str)
-                fi.write('\\caption{%s results for %s method.}\n' % (k, method))
+                fi.write('\\caption{%s}\n' % caption)
                 fi.write('\\end{table}\n')
