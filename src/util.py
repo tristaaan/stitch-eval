@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def paste(canvas, paint):
     '''
     Paste an image on to another using masks.
@@ -99,25 +100,27 @@ def equalize_image(stitched, target_size):
 
 def bounds_equalize(target, ref):
     '''
-    Given two images, target larger than ref, 0-pad ref so that
-    ref becomes the same size as target
+    Given two images, pad them to make them the same size
     '''
     yd,xd = tuple_sub(target.shape, ref.shape)
     if yd < 0:
-        ref = ref[-yd//2:yd//2,:]
+        target = np.pad(target, ((-yd//2,-yd//2), (0,0)), 'constant', constant_values=(0,0))
     else:
         ref = np.pad(ref, ((yd//2,yd//2), (0,0)), 'constant', constant_values=(0,0))
 
     if xd < 0:
-        ref = ref[:,-xd//2:xd//2]
+        target = np.pad(target, ((0,0), (-xd//2,-xd//2)), 'constant', constant_values=(0,0))
     else:
         ref = np.pad(ref, ((0,0), (xd//2,xd//2)), 'constant', constant_values=(0,0))
 
-    # there can be some off-by-one errors from division,
-    # make sure they're the same size
-    if sum(tuple_sub(target.shape, ref.shape)) != 0:
+    # there can be some off-by-one errors from division, make sure they're the same size
+    if target.shape != ref.shape:
         py = target.shape[0] - ref.shape[0] if target.shape[0] > ref.shape[0] else 0
         px = target.shape[1] - ref.shape[1] if target.shape[1] > ref.shape[1] else 0
         ref = np.pad(ref, ((0,py),(0,px)), 'constant', constant_values=(0,0))
 
-    return ref
+        py = ref.shape[0] - target.shape[0] if ref.shape[0] > target.shape[0] else 0
+        px = ref.shape[1] - target.shape[1] if ref.shape[1] > target.shape[1] else 0
+        target = np.pad(target, ((0,py),(0,px)), 'constant', constant_values=(0,0))
+
+    return target, ref
