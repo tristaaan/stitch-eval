@@ -20,21 +20,25 @@ def eval_method(image_name, method, **kwargs):
         original = resize(original, width=kwargs['downsample'])
     blocks = im_split(image_name, **kwargs)
     stitched, duration = method(blocks)
+    if duration == 0:
+        return (duration, np.NAN, np.NAN)
     acc_result = i_RMSE(stitched, original)
     suc_result = success_measurement(stitched, original)
     return (duration, acc_result, suc_result)
 
 
-def eval_param(image_name, method, param, data_range, downsample):
-    table = pd.DataFrame(columns=[param, 'time', 'error', 'success'])
+def eval_param(image_name, method, param, data_range, downsample=False, overlap=0.2):
+    row = []
     print('%s evaluation with %s' % (param, method.__name__))
     for val in data_range:
-        kw = { param: val, 'downsample': downsample }
+        kw = { param: val, 'downsample': downsample, }
+        if param != 'overlap':
+            kw['overlap'] = overlap
         duration, err, suc = eval_method(image_name, method, **kw)
         print("param: %0.2f, t: %0.2f, err: %0.2f suc: %0.2f" % (val, duration, err, suc))
-        table = table.append(
-        {param: val, 'time': duration, 'error': err, 'success': suc}, ignore_index=True)
-    return table
+        row.append('(%.02f, %.02f)' % (err, suc))
+        # {param: val, 'time': duration, 'error': err, 'success': suc }
+    return row
 
 
 def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
@@ -45,18 +49,40 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         rotation = True
         overlap  = True
 
+    overlap_range = [o/100 for o in range(5, 51, 5)]
+
     out = {}
     if noise:
-        dr = [d / 100 for d in range(0,11,2)]
-        out['noise'] = eval_param(image_name, method, 'noise', dr, downsample)
+        noise_range = [d / 100 for d in range(0,11,2)]
+        table = []
+        for o in overlap_range:
+            kw = {'overlap': o, 'downsample': downsample}
+            table.append(eval_param(image_name, method, 'noise', noise_range, **kw))
+
+        df = pd.DataFrame(table, columns=noise_range, index=overlap_range)
+        df.index.names = ['overlap']
+        df.columns.names = ['rotation']
+        out['noise'] = df
 
     if rotation:
-        dr = range(0,181,45)
-        out['rotation'] = eval_param(image_name, method, 'rotation', dr, downsample)
+        rot_range = range(0,181,45)
+        table = []
+        for o in overlap_range:
+            kw = {'overlap': o, 'downsample': downsample}
+            table.append(eval_param(image_name, method, 'rotation',
+                                    rot_range, **kw))
+        df = pd.DataFrame(table, columns=rot_range, index=overlap_range)
+        df.index.names = ['overlap']
+        df.columns.names = ['rotation']
+        out['rotation'] = df
 
     if overlap:
-        dr = [o/100 for o in range(5, 51, 5)]
-        out['overlap'] = eval_param(image_name, method, 'overlap', dr, downsample)
+        table = eval_param(image_name, method, 'overlap', overlap_range, downsample)
+        df = pd.DataFrame(table).transpose()
+        df.index = overlap_range
+        df.index.names = ['overlap']
+        df.columns = ['']
+        out['overlap'] = df
 
     return out
 
@@ -116,7 +142,7 @@ if __name__ == '__main__':
     for k in results.keys():
         print(results[k])
         if kw['output']:
-            latex_str = results[k].to_latex(index=False)
+            latex_str = results[k].to_latex()
             with open('%s_%s.tex' % (method, k), 'w') as fi:
                 fi.write('\\begin{table}\n\\centering\n')
                 fi.write(latex_str)
