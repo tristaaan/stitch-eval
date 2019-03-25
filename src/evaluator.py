@@ -35,7 +35,7 @@ def eval_param(image_name, method, param, data_range, downsample=False, overlap=
         if param != 'overlap':
             kw['overlap'] = overlap
         duration, err, suc = eval_method(image_name, method, **kw)
-        print("param: %0.2f, t: %0.2f, err: %0.2f suc: %0.2f" % (val, duration, err, suc))
+        print("%s: %0.2f, t: %0.2f, err: %0.2f suc: %0.2f" % (param, val, duration, err, suc))
         row.append('(%.02f, %.02f)' % (err, suc))
         # {param: val, 'time': duration, 'error': err, 'success': suc }
     return row
@@ -65,7 +65,7 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         out['noise'] = df
 
     if rotation:
-        rot_range = range(0,181,45)
+        rot_range = range(0,90,10)
         table = []
         for o in overlap_range:
             kw = {'overlap': o, 'downsample': downsample}
