@@ -1,7 +1,7 @@
 '''
 https://github.com/oarriaga/STN.keras
 '''
-
+import numpy as np
 from keras import backend as K
 from keras.engine.topology import Layer
 
@@ -125,8 +125,11 @@ class BilinearInterpolation(Layer):
 
     def _transform(self, X, affine_transformation, output_size):
         batch_size, num_channels = K.shape(X)[0], K.shape(X)[3]
+        mask = tf.constant(np.array([[1,1, output_size[1]], 
+                                     [1,1, output_size[0]]]), dtype=tf.float32)
         transformations = K.reshape(affine_transformation,
                                     shape=(batch_size, 2, 3))
+        transformations = tf.multiply(transformations, mask)
         # transformations = K.cast(affine_transformation[:, 0:2, :], 'float32')
         regular_grids = self._make_regular_grids(batch_size, *output_size)
         sampled_grids = K.batch_dot(transformations, regular_grids)
