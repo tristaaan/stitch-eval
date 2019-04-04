@@ -65,7 +65,7 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         out['noise'] = df
 
     if rotation:
-        rot_range = range(0,90,10)
+        rot_range = range(0,91,10)
         table = []
         for o in overlap_range:
             kw = {'overlap': o, 'downsample': downsample}
@@ -92,11 +92,10 @@ def i_RMSE(stitched, original):
     if stitched.shape[0] != oh or stitched.shape[1] != ow:
         stitched = equalize_image(stitched, original.shape)
 
-    total_px = ow * oh
     stitched = stitched.astype('float64') / (2**16 -1)
     original = original.astype('float64') / (2**16 -1)
     abs_err = (original - stitched) ** 2
-    return math.sqrt((1/total_px) * abs_err.sum())
+    return math.sqrt(abs_err.mean())
 
 
 def success_measurement(stitched, original):
