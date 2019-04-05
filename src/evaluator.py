@@ -10,6 +10,7 @@ from operator import mul
 
 from im_split import im_split
 from AKAZE import AKAZE
+from Direct import iterative_ssd, iterative_ncc, iterative_mi
 from Fourier import Fourier
 from util import clamp_uint16, equalize_image
 
@@ -29,7 +30,11 @@ def eval_method(image_name, method, **kwargs):
 
 def eval_param(image_name, method, param, data_range, downsample=False, overlap=0.2):
     row = []
-    print('%s: %s, overlap: %0.2f' % (method.__name__, param, overlap))
+    if param != 'overlap':
+        print('%s: %s, overlap: %0.2f' % (method.__name__, param, overlap))
+    else:
+        print('%s: %s, overlap: %0.2f' % (method.__name__, param, data_range[0]))
+
     for val in data_range:
         kw = { param: val, 'downsample': downsample, }
         if param != 'overlap':
@@ -49,7 +54,8 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         rotation = True
         overlap  = True
 
-    overlap_range = [o/100 for o in range(5, 51, 5)]
+    overlap_range = [o/100 for o in range(10, 51, 5)]
+    columns = map(lambda x: '%.0f%%' % (x*100), overlap_range)
 
     out = {}
     if noise:
@@ -61,7 +67,8 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
 
         df = pd.DataFrame(table, columns=noise_range, index=overlap_range)
         df.index.names = ['overlap']
-        df.columns.names = ['rotation']
+        df.columns.names = ['noise']
+        df.columns = columns
         out['noise'] = df
 
     if rotation:
@@ -74,14 +81,14 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         df = pd.DataFrame(table, columns=rot_range, index=overlap_range)
         df.index.names = ['overlap']
         df.columns.names = ['rotation']
+        df.columns = columns
         out['rotation'] = df
 
     if overlap:
         table = eval_param(image_name, method, 'overlap', overlap_range, downsample)
         df = pd.DataFrame(table).transpose()
-        df.index = overlap_range
         df.index.names = ['overlap']
-        df.columns = ['']
+        df.columns = columns
         out['overlap'] = df
 
     return out
@@ -106,7 +113,7 @@ def success_measurement(stitched, original):
     '''
     s = stitched.shape
     o = original.shape
-    if s[0] != o[0] or mul(*s) != mul(*o):
+    if s[0] != o[0] or s[1] != o[1]:
         diff  = abs(mul(*s) - mul(*o))
         total =     mul(*s) + mul(*o)
         return 1.0 - (diff / total)
@@ -114,7 +121,7 @@ def success_measurement(stitched, original):
 
 
 def method_picker(name):
-    methods = [Fourier, AKAZE]
+    methods = [Fourier, AKAZE, iterative_ssd, iterative_ncc, iterative_mi]
     method_names = list(map(lambda x: x.__name__.lower(), methods))
     return methods[method_names.index(name.lower())]
 
@@ -135,9 +142,14 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     kw = vars(args)
+    # get method to evaluate
     method = kw['method']
     kw['method'] = method_picker(method)
+
+    # evaluate!
     results = run_eval(kw['file'], **kw)
+
+    # write output
     for k in results.keys():
         print(results[k])
         if kw['output']:
