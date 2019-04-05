@@ -29,7 +29,7 @@ def eq_paste(canvas, paint):
     ch, cw = canvas.shape
     ph, pw = paint.shape
     nw, nh = (0,0)
-    # if the canvas is smaller than the paint size, pad the image.
+    # if the canvas is smaller than the paint size, pad the output image.
     if cw < pw:
         nw = pw - cw
     if ch < ph:
