@@ -55,7 +55,6 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         overlap  = True
 
     overlap_range = [o/100 for o in range(10, 51, 5)]
-    columns = map(lambda x: '%.0f%%' % (x*100), overlap_range)
 
     out = {}
     if noise:
@@ -68,11 +67,11 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         df = pd.DataFrame(table, columns=noise_range, index=overlap_range)
         df.index.names = ['overlap']
         df.columns.names = ['noise']
-        df.columns = columns
+        df.columns = map(lambda x: '%.02fdb' % (x), noise_range)
         out['noise'] = df
 
     if rotation:
-        rot_range = range(0,91,10)
+        rot_range = range(-45,46,15)
         table = []
         for o in overlap_range:
             kw = {'overlap': o, 'downsample': downsample}
@@ -81,14 +80,14 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         df = pd.DataFrame(table, columns=rot_range, index=overlap_range)
         df.index.names = ['overlap']
         df.columns.names = ['rotation']
-        df.columns = columns
+        df.columns = map(lambda x: '%d°' % (x), rot_range)
         out['rotation'] = df
 
     if overlap:
         table = eval_param(image_name, method, 'overlap', overlap_range, downsample)
         df = pd.DataFrame(table).transpose()
         df.index.names = ['overlap']
-        df.columns = columns
+        df.columns = map(lambda x: '%.0f%%' % (x*100), overlap_range)
         out['overlap'] = df
 
     return out
