@@ -18,7 +18,7 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, *
     '''
     assert blocks > 1, 'blocks must be greater than one'
     assert math.sqrt(blocks).is_integer(), '√blocks must be a whole integer'
-    assert overlap >= 0 and overlap <= 1, 'overlap must be in the range 0...1'
+    assert overlap >= 0 and overlap <= 1, 'overlap must be in the range 0...1 inclusive'
 
     im = imageio.imread('%s' % fname)
     if downsample > 0:
