@@ -3,6 +3,7 @@ import imageio
 import numpy as np
 import scipy as sp
 
+from operator import lt, gt
 from collections import deque
 from imageio import imread, imwrite
 from math import sqrt
@@ -26,9 +27,9 @@ def fill_fn(fn, size):
 def objective_function(measurement):
     name = measurement.__name__
     if name == 'NCC' or name == 'MI' or name == 'SRD':
-        return np.argmax
+        return (-np.inf, gt, np.max, np.argmax)
     elif name == 'SSD' or name == 'SAD':
-        return np.argmin
+        return (np.inf, lt, np.min, np.argmin)
     else:
         raise ValueError('Unrecognized measurement method: %s' % name)
 
@@ -88,8 +89,8 @@ def NCC_whiten(im1, im2):
     whiten the images based on a '2D prediction error filter' of the reference image (im1)
     '''
     a_pred = lpc(im1, im2)
-    im1 += np.square(abs(im1 - a_pred))
-    im2 += np.square(abs(im2 - a_pred))
+    im1 += np.square(abs(im1 - a_pred).astype('uint16'))
+    im2 += np.square(abs(im2 - a_pred).astype('uint16'))
     return (im1, im2)
 
 # mutual information
@@ -115,11 +116,14 @@ def shan_entropy(c):
     c_normalized = c_normalized[np.nonzero(c_normalized)]
     return -sum(c_normalized* np.log2(c_normalized)) # same as scipy.stats.entropy(c_norm, base=2)
 
-def iterative(ref_src, mov_src, measurement=NCC, theta_range=(-45,45), im_filter=None):
+def iterative(ref_src, mov_src, measurement=NCC, theta_range=(-45,45), \
+              im_filter=None, im2_filter=None):
     ref = ref_src
     mov = mov_src
     # when the image is rotated it may be larger, fill this value in the new places.
     inorm = 2**15 # middle value of uint16
+
+    mmax, compfn, valfn, argfn = objective_function(measurement)
 
     # initialize transformation parameters
     prev_x, prev_y = (np.inf, np.inf)
@@ -127,8 +131,11 @@ def iterative(ref_src, mov_src, measurement=NCC, theta_range=(-45,45), im_filter
     prev_theta = np.inf
     total_theta = 0
 
+    theta_score = mmax
+    translation_score = mmax
+
     # terminate when there are no more translational and rotational changes
-    while x != prev_x or y != prev_y: #or total_theta != prev_theta:
+    while x != prev_x or y != prev_y or total_theta != prev_theta:
         # rotate from previous transform
         mov = mov_src.copy()
         if total_theta != 0:
@@ -137,44 +144,46 @@ def iterative(ref_src, mov_src, measurement=NCC, theta_range=(-45,45), im_filter
         if im_filter != None:
             ref = im_filter(ref)
             mov = im_filter(mov)
+        if im2_filter != None:
+            ref, mov = im2_filter(ref, mov)
         # find best x,y
         p = int(mov.shape[0])
-        ref_padded = np.pad(ref, ((p,p), (p,p)), 'constant', constant_values=(0,0))
+        ref_padded = np.pad(ref, ((p,p), (p,p)), 'reflect')
         xy_corr = convolve(ref_padded, mov, measurement)
         prev_x, prev_y = (x,y)
-        y,x = np.unravel_index(objective_function(measurement)(xy_corr), xy_corr.shape)
-        p2 = int(p/2)
+        ty,tx = np.unravel_index(argfn(xy_corr), xy_corr.shape)
+        score = valfn(xy_corr)
+        if compfn(score, translation_score):
+            translation_score = score
+            y,x = (ty,tx)
 
-        # # find best theta
-        # thetas = list(range(theta_range[0], theta_range[1]+1))
-        # theta_corr = []
-        # for theta in thetas:
-        #     # rotate moving image, may change here if reshape=True.
-        #     mov_r = rotate(mov_src, total_theta-theta, reshape=False)
-        #     mov_r[mov_r == 0] = inorm
-        #     if im_filter != None:
-        #         mov_r = im_filter(mov_r)
-        #     orig_ref = ref.shape[0]
-        #     p2 = int(orig_ref / 2)
-        #     diff = mov_r.shape[0] - orig_ref
-        #     margin_s = int(diff / 2)
-        #     margin_e = mov_r.shape[0] - margin_s
-        #     ref_range = ref_padded[y-p2:y+p2, x-p2:x+p2]
-        #     if ref_range.shape != mov_r[margin_s:margin_e, margin_s:margin_e].shape:
-        #         ref_range = ref_padded[y-p2:y+p2+1, x-p2:x+p2+1]
-        #     c = measurement(ref_range, mov_r[margin_s:margin_e, margin_s:margin_e])
-        #     # store measurement value
-        #     theta_corr.append(c)
-        # # recover the best theta
-        # prev_theta = total_theta
-        # delta_theta = thetas[objective_function(measurement)(theta_corr)]
-        # total_theta -= delta_theta
-        mov_r = rotate(mov_src, total_theta, reshape=False)
+        # find best theta
+        thetas = list(range(theta_range[0], theta_range[1]+1))
+        theta_corr = []
+        for theta in thetas:
+            # rotate moving image, may change here if reshape=True.
+            mov_r = rotate(mov, total_theta-theta, reshape=False)
+            if im_filter != None:
+                mov_r = im_filter(mov_r)
+            orig_ref = ref.shape[0]
+            p2 = int(orig_ref / 2)
+            ref_range = ref_padded[y-p2:y+p2, x-p2:x+p2]
+            ref_range, mov_r = bounds_equalize(ref_range, mov_r)
+            c = measurement(ref_range, mov_r)
+            # store measurement value
+            theta_corr.append(c)
+        # recover the best theta
+        prev_theta = total_theta
+        delta_theta = thetas[argfn(theta_corr)]
+        score = valfn(theta_corr)
+        if compfn(score, theta_score):
+            theta_score = score
+            total_theta -= delta_theta
 
-    # print(x-p, y-p, -total_theta)
+    print(x-p, y-p, -total_theta)
     return (x-p, y-p, -total_theta)
 
-def iterative_generic(blocks, measurement=NCC):
+def iterative_generic(blocks, measurement=NCC, **kwargs):
     queue = deque(blocks)
     base = queue.popleft()
     ind = 0
@@ -186,7 +195,7 @@ def iterative_generic(blocks, measurement=NCC):
 
         # start timer
         start = time()
-        x,y,angle = iterative(base, im2, measurement=measurement)
+        x,y,angle = iterative(base, im2, measurement=measurement, **kwargs)
 
         if angle != 0:
             im2 = rotate(im2, angle, reshape=False)
@@ -213,7 +222,7 @@ def iterative_ssd(blocks):
     return iterative_generic(blocks, measurement=SSD)
 
 def iterative_ncc(blocks):
-    return iterative_generic(blocks, measurement=NCC)
+    return iterative_generic(blocks, measurement=NCC)#, im2_filter=NCC_whiten)
 
 def iterative_mi(blocks):
     return iterative_generic(blocks, measurement=MI)

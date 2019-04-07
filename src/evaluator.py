@@ -54,7 +54,7 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         rotation = True
         overlap  = True
 
-    overlap_range = [o/100 for o in range(10, 51, 5)]
+    overlap_range = [o/100 for o in range(10, 101, 10)]
 
     out = {}
     if noise:
