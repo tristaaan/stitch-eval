@@ -147,8 +147,8 @@ def iterative(ref_src, mov_src, measurement=NCC, theta_range=(-45,45), \
         if im2_filter != None:
             ref, mov = im2_filter(ref, mov)
         # find best x,y
-        p = int(mov.shape[0])
-        ref_padded = np.pad(ref, ((p,p), (p,p)), 'reflect')
+        py,px = mov.shape
+        ref_padded = np.pad(ref, ((py,py), (px,px)), 'reflect')
         xy_corr = convolve(ref_padded, mov, measurement)
         prev_x, prev_y = (x,y)
         ty,tx = np.unravel_index(argfn(xy_corr), xy_corr.shape)
@@ -165,9 +165,9 @@ def iterative(ref_src, mov_src, measurement=NCC, theta_range=(-45,45), \
             mov_r = rotate(mov, total_theta-theta, reshape=False)
             if im_filter != None:
                 mov_r = im_filter(mov_r)
-            orig_ref = ref.shape[0]
-            p2 = int(orig_ref / 2)
-            ref_range = ref_padded[y-p2:y+p2, x-p2:x+p2]
+            py2 = int(ref.shape[0] / 2)
+            px2 = int(ref.shape[1] / 2)
+            ref_range = ref_padded[y-py2:y+py2, x-px2:x+px2]
             ref_range, mov_r = bounds_equalize(ref_range, mov_r)
             c = measurement(ref_range, mov_r)
             # store measurement value
@@ -180,43 +180,38 @@ def iterative(ref_src, mov_src, measurement=NCC, theta_range=(-45,45), \
             theta_score = score
             total_theta -= delta_theta
 
-    print(x-p, y-p, -total_theta)
-    return (x-p, y-p, -total_theta)
+    # print(x-px, y-py, -total_theta)
+    return (x-px, y-py, -total_theta)
 
-def iterative_generic(blocks, measurement=NCC, **kwargs):
-    queue = deque(blocks)
-    base = queue.popleft()
-    ind = 0
-    total_time = 0
-    while len(queue) > 0:
-        # load images
-        im2 = queue.popleft()
-        # base, im2 = bounds_equalize(base, im2)
+def stitch(im1, im2, **kwargs):
+    start = time()
+    x,y,angle = iterative(im1, im2, **kwargs)
 
-        # start timer
-        start = time()
-        x,y,angle = iterative(base, im2, measurement=measurement, **kwargs)
+    if angle != 0:
+        im2 = rotate(im2, angle, reshape=False)
 
-        if angle != 0:
-            im2 = rotate(im2, angle, reshape=False)
+    im2 = crop_zeros(im2, zero=100)
+    im1 = crop_zeros(im1, zero=100)
+    half_y = int(im2.shape[0] / 2)
+    half_x = int(im2.shape[1] / 2)
+    ny = max(y - half_y, 0)
+    nx = max(x - half_x, 0)
+    im2 = np.pad(im2, ((ny, 0), (nx, 0)), 'constant', constant_values=(0,0))
+    # merge and crop
+    base = crop_zeros(eq_paste(im1, im2), zero=100)
+    return (base, time() - start)
 
-        im2 = crop_zeros(im2, zero=100)
-        base = crop_zeros(base, zero=100)
-        half_y = int(im2.shape[0] / 2)
-        half_x = int(im2.shape[1] / 2)
-        ny = max(y - half_y, 0)
-        nx = max(x - half_x, 0)
-        im2 = np.pad(im2, ((ny, 0), (nx, 0)), 'constant', constant_values=(0,0))
-        # paste
-        base = eq_paste(base, im2)
-        total_time += time() - start
-        print('stitched %d with %d' % (ind, ind + 1))
-        ind += 1
+def iterative_generic(blocks, **kwargs):
+    A,B,C,D = blocks
 
-    base = crop_zeros(base, zero=100)
-    imwrite('../data/stitched.tif', base)
-    average_time = total_time / (len(blocks) - 1)
-    return (base, average_time)
+    AB, t1 = stitch(A, B, **kwargs)
+    CD, t2 = stitch(C, D, **kwargs)
+    E,  t3 = stitch(AB, CD, **kwargs)
+
+    E = crop_zeros(E, zero=250)
+    imwrite('../data/stitched.tif', E)
+    average_time = sum([t1,t2,t3]) / 3
+    return (E, average_time)
 
 def iterative_ssd(blocks):
     return iterative_generic(blocks, measurement=SSD)

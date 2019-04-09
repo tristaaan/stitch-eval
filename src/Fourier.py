@@ -23,6 +23,7 @@ def norm_cross_power_spectrum(i1, i2):
     f2 = fft2(i2)
     return (f1 * conj(f2)) / abs(f2 * conj(f2))
 
+
 def cross_power_spectrum(i1, i2):
     '''
     Cross power spectrum,
@@ -33,11 +34,12 @@ def cross_power_spectrum(i1, i2):
     f2 = fft2(i2)
     return (f1 * conj(f2)) / abs(f1 * conj(f2))
 
+
 def phase_correlation(i1, i2):
     '''
     Image Alignment and Stitching: A Tutorial, R. Szeliski
-    "here the spectrum of the two signals is **whitened** by dividing each per frequency product
-    by the magnitudes of the Fourier transforms"
+    "here the spectrum of the two signals is whitened by dividing each
+    per frequency product by the magnitudes of the Fourier transforms"
     '''
     assert i1.shape[0] == i2.shape[0] and i1.shape[1] == i2.shape[1], 'images are different sizes: %s v %s' % (i1.shape, i2.shape,)
     f1 = fft2(i1)
@@ -67,6 +69,12 @@ def NCC(i1, i2):
     if sqrt(dnom) == 0:
         return 0
     return nom / sqrt(dnom)
+
+
+def apply_hamming_window(im):
+    h = np.hamming(im.shape[0])
+    ham2d = np.sqrt(np.outer(h,h))
+    return im * ham2d
 
 
 def test_corners(ref, mov, pt):
@@ -158,8 +166,9 @@ def find_best_corner(i1, i2, old_shape, x,y):
     xys.append((nx,ny))
 
     # tl, tr, bl, br
-    corner = corners[np.argmax(corner_scores)]
-    nx, ny = xys[np.argmax(corner_scores)]
+    best_corner = np.argmax(corner_scores)
+    corner = corners[best_corner]
+    nx, ny = xys[best_corner]
     return corner, nx, ny
 
 
@@ -192,54 +201,54 @@ def prepare_paste(i1, i2, old_shape, x,y):
 
 
 def Fourier(blocks):
-    queue = deque(blocks)
-    base = queue.popleft()
-    ind = 0
-    total_time = 0
-    while len(queue) > 0:
-        # load images
-        im2 = queue.popleft()
-        base, im2 = bounds_equalize(base, im2)
+    A,B,C,D = blocks
 
-        # start timer
-        start = time()
+    AB, t1 = F_stitch(A, B)
+    CD, t2 = F_stitch(C, D)
+    E,  t3 = F_stitch(AB, CD) # argument order matters here
 
-        # convert to log-polar coordinates
-        base_p = log_polar(base)
-        im2_p = log_polar(im2)
+    E = crop_zeros(E, zero=100)
+    imwrite('../data/stitched.tif', E)
+    average_time = sum([t1,t2,t3]) / 3
+    return (E, average_time)
 
-        # find correlation
-        impulse = ifft2(phase_correlation(base_p, im2_p))
-        theta, _ = np.unravel_index(np.argmax(impulse), impulse.shape)
+def F_stitch(im1, im2):
+    # start timer
+    start = time()
 
-        # calculate angle in degrees
-        angle = theta * (360 / impulse.shape[0]) % 180
-        if angle < -90:
-            angle += 180
-        elif angle > 90:
-            angle -= 180
+    if im1.shape != im2.shape:
+        im1, im2 = bounds_equalize(im1, im2)
 
-        # rotate the moving image to the correct angle
-        if angle != 0:
-            im2 = ndimage.rotate(im2, -angle, reshape=False)
+    # convert to log-polar coordinates
+    im1_p = log_polar(im1)
+    im2_p = log_polar(im2)
 
-        im2 = crop_zeros(im2, zero=500)
-        base = crop_zeros(base, zero=500)
-        # find the x,y translation
-        im2_orig = im2.copy()
-        base, im2 = bounds_equalize(base, im2)
-        impulse = ifft2(phase_correlation(base, im2))
-        y,x = np.unravel_index(np.argmax(impulse), impulse.shape)
+    # find correlation
+    impulse = ifft2(phase_correlation(im1_p, im2_p))
+    theta, _ = np.unravel_index(np.argmax(impulse), impulse.shape)
 
-        # prepare the image to be pasted
-        im2 = prepare_paste(base, im2_orig, im2.shape, x, y)
-        # paste
-        base = eq_paste(base, im2)
-        total_time += time() - start
-        print('stitched %d with %d' % (ind, ind + 1))
-        ind += 1
+    # calculate angle in degrees
+    angle = theta * (360 / impulse.shape[0]) % 180
+    if angle < -90:
+        angle += 180
+    elif angle > 90:
+        angle -= 180
 
+    # rotate the moving image to the correct angle
+    if angle != 0:
+        im2 = ndimage.rotate(im2, -angle, reshape=False)
+
+    im2 = crop_zeros(im2, zero=500)
+    im1 = crop_zeros(im1, zero=500)
+    # find the x,y translation
+    im2_orig = im2.copy()
+    im1, im2 = bounds_equalize(im1, im2)
+    impulse = ifft2(phase_correlation(im1, im2))
+    y,x = np.unravel_index(np.argmax(impulse), impulse.shape)
+
+    # prepare the image to be pasted
+    im2 = prepare_paste(im1, im2_orig, im2.shape, x, y)
+    # paste
+    base = eq_paste(im1, im2)
     base = crop_zeros(base, zero=100)
-    imwrite('../data/stitched.tif', base)
-    average_time = total_time / (len(blocks) - 1)
-    return (base, average_time)
+    return (base, time() - start)

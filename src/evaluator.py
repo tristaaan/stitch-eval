@@ -21,8 +21,8 @@ def eval_method(image_name, method, **kwargs):
         original = resize(original, width=kwargs['downsample'])
     blocks = im_split(image_name, **kwargs)
     stitched, duration = method(blocks)
-    if duration == 0:
-        return (duration, np.NAN, np.NAN)
+    if duration == None:
+        return (0, np.NAN, np.NAN)
     acc_result = i_RMSE(stitched, original)
     suc_result = success_measurement(stitched, original)
     return (duration, acc_result, suc_result)
