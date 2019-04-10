@@ -11,7 +11,7 @@ from operator import mul
 from im_split import im_split
 from AKAZE import AKAZE
 from Direct import iterative_ssd, iterative_ncc, iterative_mi
-from Fourier import Fourier
+from Fourier import Frequency, Frequency_highpass
 from util import clamp_uint16, equalize_image
 
 
@@ -24,7 +24,7 @@ def eval_method(image_name, method, **kwargs):
     if duration == None:
         return (0, np.NAN, np.NAN)
     acc_result = i_RMSE(stitched, original)
-    suc_result = success_measurement(stitched, original)
+    suc_result = acc_result < 0.10
     return (duration, acc_result, suc_result)
 
 
@@ -41,8 +41,7 @@ def eval_param(image_name, method, param, data_range, downsample=False, overlap=
             kw['overlap'] = overlap
         duration, err, suc = eval_method(image_name, method, **kw)
         print("%s: %0.2f, t: %0.2f, err: %0.2f suc: %0.2f" % (param, val, duration, err, suc))
-        row.append('(%.02f, %.02f)' % (err, suc))
-        # {param: val, 'time': duration, 'error': err, 'success': suc }
+        row.append('(%.02f, %0.02fs)' % (err, duration))
     return row
 
 
@@ -103,24 +102,8 @@ def i_RMSE(stitched, original):
     abs_err = (original - stitched) ** 2
     return math.sqrt(abs_err.mean())
 
-
-def success_measurement(stitched, original):
-    '''
-    The two images should be the same size or very close.
-    If they are not, there can be some measurement of success applied based
-    on their difference in number of pixels
-    '''
-    s = stitched.shape
-    o = original.shape
-    if s[0] != o[0] or s[1] != o[1]:
-        diff  = abs(mul(*s) - mul(*o))
-        total =     mul(*s) + mul(*o)
-        return 1.0 - (diff / total)
-    return 1.0
-
-
 def method_picker(name):
-    methods = [Fourier, AKAZE, iterative_ssd, iterative_ncc, iterative_mi]
+    methods = [Frequency, Frequency_highpass, AKAZE, iterative_ssd, iterative_ncc, iterative_mi]
     method_names = list(map(lambda x: x.__name__.lower(), methods))
     return methods[method_names.index(name.lower())]
 
