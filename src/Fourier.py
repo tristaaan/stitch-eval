@@ -5,7 +5,7 @@ import scipy as sp
 
 from collections import deque
 from imageio import imread, imwrite
-from math import sqrt
+from math import pi,sqrt
 from numpy.fft import fft2, ifft2
 from operator import mul
 from scipy import conj, ndimage
@@ -14,16 +14,20 @@ from time import time
 from util import bounds_equalize, crop_zeros, eq_paste, tuple_sub
 
 
-def norm_cross_power_spectrum(i1, i2):
+def norm_cross_power_spectrum(i1, i2, highpass=False):
     '''
     normalized cross power spectrum, Faroosh et. al.
     '''
     assert i1.shape[0] == i2.shape[0] and i1.shape[1] == i2.shape[1], 'images are different sizes: %s v %s' % (i1.shape, i2.shape,)
     f1 = fft2(i1)
     f2 = fft2(i2)
+    if highpass:
+        f1 = f1 * highpass_filter(f1.shape)
+        f2 = f2 * highpass_filter(f2.shape)
     return (f1 * conj(f2)) / abs(f2 * conj(f2))
 
-def cross_power_spectrum(i1, i2):
+
+def cross_power_spectrum(i1, i2, highpass=False):
     '''
     Cross power spectrum,
     Image Mosaic Based on Phase Correlation and Harris Operator, F. Yang et al.
@@ -31,17 +35,24 @@ def cross_power_spectrum(i1, i2):
     assert i1.shape[0] == i2.shape[0] and i1.shape[1] == i2.shape[1], 'images are different sizes: %s v %s' % (i1.shape, i2.shape,)
     f1 = fft2(i1)
     f2 = fft2(i2)
+    if highpass:
+        f1 = f1 * highpass_filter(f1.shape)
+        f2 = f2 * highpass_filter(f2.shape)
     return (f1 * conj(f2)) / abs(f1 * conj(f2))
 
-def phase_correlation(i1, i2):
+
+def phase_correlation(i1, i2, highpass=False):
     '''
     Image Alignment and Stitching: A Tutorial, R. Szeliski
-    "here the spectrum of the two signals is **whitened** by dividing each per frequency product
-    by the magnitudes of the Fourier transforms"
+    "here the spectrum of the two signals is whitened by dividing each
+    per frequency product by the magnitudes of the Fourier transforms"
     '''
     assert i1.shape[0] == i2.shape[0] and i1.shape[1] == i2.shape[1], 'images are different sizes: %s v %s' % (i1.shape, i2.shape,)
     f1 = fft2(i1)
     f2 = fft2(i2)
+    if highpass:
+        f1 = f1 * highpass_filter(f1.shape)
+        f2 = f2 * highpass_filter(f2.shape)
     return (f1 * conj(f2)) / (abs(f1) * abs(f2))
 
 
@@ -52,6 +63,16 @@ def log_polar(img, radius=2.0):
     center = (img.shape[0] / 2, img.shape[1] / 2)
     radius = round(sqrt(center[0] ** radius + center[1] ** radius))
     return cv2.warpPolar(img, img.shape, center, radius, cv2.WARP_POLAR_LOG)
+
+
+def highpass_filter(shape):
+    '''
+    Return highpass filter to be multiplied with fourier transform.
+    '''
+    x = np.outer(
+        np.cos(np.linspace(-pi/2., pi/2., shape[0])),
+        np.cos(np.linspace(-pi/2., pi/2., shape[1])))
+    return (1.0 - x) * (2.0 - x)
 
 
 def NCC(i1, i2):
@@ -67,6 +88,12 @@ def NCC(i1, i2):
     if sqrt(dnom) == 0:
         return 0
     return nom / sqrt(dnom)
+
+
+def apply_hamming_window(im):
+    h = np.hamming(im.shape[0])
+    ham2d = np.sqrt(np.outer(h,h))
+    return im * ham2d
 
 
 def test_corners(ref, mov, pt):
@@ -158,8 +185,9 @@ def find_best_corner(i1, i2, old_shape, x,y):
     xys.append((nx,ny))
 
     # tl, tr, bl, br
-    corner = corners[np.argmax(corner_scores)]
-    nx, ny = xys[np.argmax(corner_scores)]
+    best_corner = np.argmax(corner_scores)
+    corner = corners[best_corner]
+    nx, ny = xys[best_corner]
     return corner, nx, ny
 
 
@@ -191,55 +219,61 @@ def prepare_paste(i1, i2, old_shape, x,y):
     return padded
 
 
-def Fourier(blocks):
-    queue = deque(blocks)
-    base = queue.popleft()
-    ind = 0
-    total_time = 0
-    while len(queue) > 0:
-        # load images
-        im2 = queue.popleft()
-        base, im2 = bounds_equalize(base, im2)
+def F_stitch(im1, im2, highpass=False):
+    # start timer
+    start = time()
 
-        # start timer
-        start = time()
+    if im1.shape != im2.shape:
+        im1, im2 = bounds_equalize(im1, im2)
 
-        # convert to log-polar coordinates
-        base_p = log_polar(base)
-        im2_p = log_polar(im2)
+    # convert to log-polar coordinates
+    im1_p = log_polar(im1)
+    im2_p = log_polar(im2)
 
-        # find correlation
-        impulse = ifft2(phase_correlation(base_p, im2_p))
-        theta, _ = np.unravel_index(np.argmax(impulse), impulse.shape)
+    # find correlation
+    impulse = ifft2(phase_correlation(im1_p, im2_p, highpass=highpass))
+    theta, _ = np.unravel_index(np.argmax(impulse), impulse.shape)
 
-        # calculate angle in degrees
-        angle = theta * (360 / impulse.shape[0]) % 180
-        if angle < -90:
-            angle += 180
-        elif angle > 90:
-            angle -= 180
+    # calculate angle in degrees
+    angle = theta * (360 / impulse.shape[0]) % 180
+    if angle < -90:
+        angle += 180
+    elif angle > 90:
+        angle -= 180
 
-        # rotate the moving image to the correct angle
-        if angle != 0:
-            im2 = ndimage.rotate(im2, -angle, reshape=False)
+    # rotate the moving image to the correct angle
+    if angle != 0:
+        im2 = ndimage.rotate(im2, -angle, reshape=False)
 
-        im2 = crop_zeros(im2, zero=500)
-        base = crop_zeros(base, zero=500)
-        # find the x,y translation
-        im2_orig = im2.copy()
-        base, im2 = bounds_equalize(base, im2)
-        impulse = ifft2(phase_correlation(base, im2))
-        y,x = np.unravel_index(np.argmax(impulse), impulse.shape)
+    im2 = crop_zeros(im2, zero=500)
+    im1 = crop_zeros(im1, zero=500)
+    # find the x,y translation
+    im2_orig = im2.copy()
+    im1, im2 = bounds_equalize(im1, im2)
+    impulse = ifft2(phase_correlation(im1, im2, highpass=highpass))
+    y,x = np.unravel_index(np.argmax(impulse), impulse.shape)
 
-        # prepare the image to be pasted
-        im2 = prepare_paste(base, im2_orig, im2.shape, x, y)
-        # paste
-        base = eq_paste(base, im2)
-        total_time += time() - start
-        print('stitched %d with %d' % (ind, ind + 1))
-        ind += 1
-
+    # prepare the image to be pasted
+    im2 = prepare_paste(im1, im2_orig, im2.shape, x, y)
+    # paste
+    base = eq_paste(im1, im2)
     base = crop_zeros(base, zero=100)
-    imwrite('../data/stitched.tif', base)
-    average_time = total_time / (len(blocks) - 1)
-    return (base, average_time)
+    return (base, time() - start)
+
+def Fourier(blocks, highpass=False):
+    A,B,C,D = blocks
+
+    AB, t1 = F_stitch(A, B, highpass=highpass)
+    CD, t2 = F_stitch(C, D, highpass=highpass)
+    E,  t3 = F_stitch(AB, CD, highpass=highpass) # argument order matters here
+
+    E = crop_zeros(E, zero=100)
+    imwrite('../data/stitched.tif', E)
+    average_time = sum([t1,t2,t3]) / 3
+    return (E, average_time)
+
+def Frequency(blocks):
+    return Fourier(blocks)
+
+def Frequency_highpass(blocks):
+    return Fourier(blocks, highpass=True)

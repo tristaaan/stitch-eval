@@ -18,7 +18,7 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, *
     '''
     assert blocks > 1, 'blocks must be greater than one'
     assert math.sqrt(blocks).is_integer(), '√blocks must be a whole integer'
-    assert overlap >= 0 and overlap <= 1, 'overlap must be in the range 0...1'
+    assert overlap >= 0 and overlap <= 1, 'overlap must be in the range 0...1 inclusive'
 
     im = imageio.imread('%s' % fname)
     if downsample > 0:
@@ -129,6 +129,7 @@ if __name__ == '__main__':
     parser.add_argument('-rotation', '-r', help='add rotation', type=int, default=0)
     parser.add_argument('-overlap', '-o', help='overlap percentage [0...1]', type=float, default=0.2)
     parser.add_argument('-blocks', '-b', help='number of blocks, must be a square number', type=int, default=4)
+    parser.add_argument('-downsample', '-ds', help='downsample output images', type=int, default=-1)
     parser.add_argument('-file', '-f', help='image filename', type=str, default='../data/T1_Img_002.00.tif')
     args = parser.parse_args()
     kw = vars(args)

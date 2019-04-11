@@ -10,7 +10,8 @@ from operator import mul
 
 from im_split import im_split
 from AKAZE import AKAZE
-from Fourier import Fourier
+from Direct import iterative_ssd, iterative_ncc, iterative_mi
+from Fourier import Frequency, Frequency_highpass
 from util import clamp_uint16, equalize_image
 
 
@@ -20,24 +21,27 @@ def eval_method(image_name, method, **kwargs):
         original = resize(original, width=kwargs['downsample'])
     blocks = im_split(image_name, **kwargs)
     stitched, duration = method(blocks)
-    if duration == 0:
-        return (duration, np.NAN, np.NAN)
+    if duration == None:
+        return (0, np.NAN, np.NAN)
     acc_result = i_RMSE(stitched, original)
-    suc_result = success_measurement(stitched, original)
+    suc_result = acc_result < 0.10
     return (duration, acc_result, suc_result)
 
 
 def eval_param(image_name, method, param, data_range, downsample=False, overlap=0.2):
     row = []
-    print('%s: %s, overlap: %0.2f' % (method.__name__, param, overlap))
+    if param != 'overlap':
+        print('%s: %s, overlap: %0.2f' % (method.__name__, param, overlap))
+    else:
+        print('%s: %s, overlap: %0.2f' % (method.__name__, param, data_range[0]))
+
     for val in data_range:
         kw = { param: val, 'downsample': downsample, }
         if param != 'overlap':
             kw['overlap'] = overlap
         duration, err, suc = eval_method(image_name, method, **kw)
         print("%s: %0.2f, t: %0.2f, err: %0.2f suc: %0.2f" % (param, val, duration, err, suc))
-        row.append('(%.02f, %.02f)' % (err, suc))
-        # {param: val, 'time': duration, 'error': err, 'success': suc }
+        row.append('(%.02f, %0.02fs)' % (err, duration))
     return row
 
 
@@ -49,7 +53,7 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         rotation = True
         overlap  = True
 
-    overlap_range = [o/100 for o in range(5, 51, 5)]
+    overlap_range = [o/100 for o in range(10, 101, 10)]
 
     out = {}
     if noise:
@@ -61,11 +65,12 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
 
         df = pd.DataFrame(table, columns=noise_range, index=overlap_range)
         df.index.names = ['overlap']
-        df.columns.names = ['rotation']
+        df.columns.names = ['noise']
+        df.columns = map(lambda x: '%.02fdb' % (x), noise_range)
         out['noise'] = df
 
     if rotation:
-        rot_range = range(0,90,10)
+        rot_range = range(-45,46,15)
         table = []
         for o in overlap_range:
             kw = {'overlap': o, 'downsample': downsample}
@@ -74,14 +79,14 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         df = pd.DataFrame(table, columns=rot_range, index=overlap_range)
         df.index.names = ['overlap']
         df.columns.names = ['rotation']
+        df.columns = map(lambda x: '%d°' % (x), rot_range)
         out['rotation'] = df
 
     if overlap:
         table = eval_param(image_name, method, 'overlap', overlap_range, downsample)
         df = pd.DataFrame(table).transpose()
-        df.index = overlap_range
         df.index.names = ['overlap']
-        df.columns = ['']
+        df.columns = map(lambda x: '%.0f%%' % (x*100), overlap_range)
         out['overlap'] = df
 
     return out
@@ -92,30 +97,13 @@ def i_RMSE(stitched, original):
     if stitched.shape[0] != oh or stitched.shape[1] != ow:
         stitched = equalize_image(stitched, original.shape)
 
-    total_px = ow * oh
     stitched = stitched.astype('float64') / (2**16 -1)
     original = original.astype('float64') / (2**16 -1)
     abs_err = (original - stitched) ** 2
-    return math.sqrt((1/total_px) * abs_err.sum())
-
-
-def success_measurement(stitched, original):
-    '''
-    The two images should be the same size or very close.
-    If they are not, there can be some measurement of success applied based
-    on their difference in number of pixels
-    '''
-    s = stitched.shape
-    o = original.shape
-    if s[0] != o[0] or mul(*s) != mul(*o):
-        diff  = abs(mul(*s) - mul(*o))
-        total =     mul(*s) + mul(*o)
-        return 1.0 - (diff / total)
-    return 1.0
-
+    return math.sqrt(abs_err.mean())
 
 def method_picker(name):
-    methods = [Fourier, AKAZE]
+    methods = [Frequency, Frequency_highpass, AKAZE, iterative_ssd, iterative_ncc, iterative_mi]
     method_names = list(map(lambda x: x.__name__.lower(), methods))
     return methods[method_names.index(name.lower())]
 
@@ -136,9 +124,14 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     kw = vars(args)
+    # get method to evaluate
     method = kw['method']
     kw['method'] = method_picker(method)
+
+    # evaluate!
     results = run_eval(kw['file'], **kw)
+
+    # write output
     for k in results.keys():
         print(results[k])
         if kw['output']:
