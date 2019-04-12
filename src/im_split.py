@@ -24,40 +24,36 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, *
     if downsample > 0:
         im = imutils.resize(im, width=downsample)
     rows = int(math.sqrt(blocks))
-    width = im.shape[0]
-    height = im.shape[1]
+    height, width = im.shape[:2]
 
     stride = None
     output_w = 0
     output_h = 0
 
-    # for some reason these two methods of splitting an image stop working at 0.5
-    if overlap < 0.5:
+        # these ratios are tricky
+    if overlap <= 0.5:
         base_block = width / rows
-        overlap_p = base_block * overlap
+        ratio = 1/((1/overlap) + 1) # increase the denominator 1/2 -> 1/3
+        overlap_p = base_block * ratio
         output_w = base_block + overlap_p
         output_h = output_w # assumes image is square
-        offset = overlap_p
         stride = base_block - overlap_p
     else:
-        ratio = 1 / ((1/overlap) + (rows-1))
-        output_w = height * ratio*2
-        offset = output_w * overlap
+        base_block = width / rows
+        ratio = overlap # decrease the denominator, 3/4 -> 1/3
+        overlap_p = base_block * ratio
+        output_w = base_block + overlap_p
         output_h = output_w # assumes image is square
+        stride = base_block- overlap_p
 
     output_images = []
     # print('b:%d o:%d' % (output_w, offset))
     for r in range(rows):
-        r_start = int(max(output_w * r - offset * r, 0))
-        if stride != None:
-            r_start = int(max(stride * r, 0))
+        r_start = int(stride * r)
         r_end   = int(min(r_start + output_w, height))
         for c in range(rows):
-            c_start = int(max(output_w * c - offset * c, 0))
-            if stride != None:
-                c_start = int(max(stride * c, 0))
+            c_start = int(stride * c)
             c_end   = int(min(c_start + output_w, width))
-            # print("%d:%d , %d:%d" % (r_start, r_end, c_start, c_end))
             block = im[r_start:r_end,c_start:c_end]
             # Do not transform the first block.
             if r+c == 0:
