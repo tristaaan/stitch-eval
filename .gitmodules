@@ -1,0 +1,4 @@
+[submodule "src/py_alpha_amd_release"]
+	path = src/py_alpha_amd_release
+	url = https://github.com/MIDA-group/py_alpha_amd_release
+	branch = master
