@@ -9,9 +9,6 @@ from imutils import resize
 from operator import mul
 
 from im_split import im_split
-from AKAZE import AKAZE
-from Direct import iterative_ssd, iterative_ncc, iterative_mi
-from Fourier import Frequency
 from util import clamp_uint16, equalize_image
 
 
@@ -103,7 +100,16 @@ def i_RMSE(stitched, original):
     return math.sqrt(abs_err.mean())
 
 def method_picker(name):
-    methods = [Frequency, AKAZE, iterative_ssd, iterative_ncc, iterative_mi]
+    from AKAZE import AKAZE
+    from amd_alpha import amd_alpha
+    from Direct import iterative_ssd, iterative_ncc, iterative_mi
+    from Fourier import Frequency
+
+    methods = [AKAZE,
+        amd_alpha,
+        Frequency,
+        iterative_ssd, iterative_ncc, iterative_mi
+    ]
     method_names = list(map(lambda x: x.__name__.lower(), methods))
     return methods[method_names.index(name.lower())]
 
