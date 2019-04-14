@@ -19,7 +19,7 @@ def eval_method(image_name, method, **kwargs):
     blocks = im_split(image_name, **kwargs)
     stitched, duration = method(blocks)
     if duration == None:
-        return (0, np.NAN, np.NAN)
+        return (0, np.NAN, False)
     acc_result = i_RMSE(stitched, original)
     suc_result = acc_result < 0.10
     return (duration, acc_result, suc_result)
@@ -38,7 +38,10 @@ def eval_param(image_name, method, param, data_range, downsample=False, overlap=
             kw['overlap'] = overlap
         duration, err, suc = eval_method(image_name, method, **kw)
         print("%s: %0.2f, t: %0.2f, err: %0.2f suc: %0.2f" % (param, val, duration, err, suc))
-        row.append('(%.02f, %0.02fs)' % (err, duration))
+        if suc:
+            row.append('(%.02f, %0.02fs)' % (err, duration))
+        else:
+            row.append(' -- ')
     return row
 
 
