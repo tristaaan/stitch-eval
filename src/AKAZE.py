@@ -67,6 +67,6 @@ def AKAZE(blocks):
     E,  t3 = stitch(AB, CD, bf_matcher)
 
     base = crop_zeros(E)
-    imwrite('../data/tmp/stitched-%s.tif' % (str(time())), E)
+    # imwrite('../data/tmp/stitched-%s.tif' % (str(time())), E)
     imwrite('../data/stitched.tif', base)
     return (base, sum([t1,t2,t3]))
