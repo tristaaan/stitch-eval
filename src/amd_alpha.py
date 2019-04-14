@@ -2,13 +2,13 @@ import os
 import sys
 
 import numpy as np
-import scipy as sp
-import scipy.misc
 
 from math import pi
 from time import time
 from imageio import imwrite
-from util import crop_zeros, eq_paste
+from imutils import rotate_bound as rotate
+
+from util import crop_zeros, eq_paste, pad
 
 sys.path.insert(0, 'py_alpha_amd_release/')
 import py_alpha_amd_release.filters as filters
@@ -30,23 +30,6 @@ param_iterations = 500
 # The fraction of the points to sample randomly (0.0-1.0)
 param_sampling_fraction = 0.1
 
-def prepare_paste(im,x,y):
-    '''
-    pad an image for pasting
-    '''
-    x = -int(x) # coordinates amd_alpha gives are reversed?
-    y = -int(y)
-    if y < 0:
-        vert = (0, abs(y))
-    else:
-        vert = (y, 0)
-
-    if x < 0:
-        horz = (0, abs(x))
-    else:
-        horz = (x, 0)
-
-    return np.pad(im, (vert, horz), 'constant', constant_values=(0,0))
 
 def stitch(ref_im, flo_im):
     # start timer
@@ -114,8 +97,8 @@ def stitch(ref_im, flo_im):
     (transform, value) = reg.get_output(0)
     theta,y,x = transform.get_params()
     print(theta, y,x)
-    flo_im_orig = sp.ndimage.rotate(flo_im_orig, -(theta * 180) / pi)
-    flo_im_orig = prepare_paste(crop_zeros(flo_im_orig, zero=100), x,y)
+    flo_im_orig = rotate(flo_im_orig, (theta * 180) / pi)
+    flo_im_orig = pad(crop_zeros(flo_im_orig, zero=100), -x,-y)
     return (eq_paste(ref_im_orig, flo_im_orig), time() - start)
 
 def amd_alpha(blocks):

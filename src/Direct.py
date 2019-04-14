@@ -8,7 +8,7 @@ from collections import deque
 from imageio import imread, imwrite
 from math import sqrt
 from PIL import Image
-from scipy.ndimage import rotate
+from imutils import rotate_bound as rotate
 from skimage.transform import resize
 from sklearn.linear_model import LinearRegression
 from time import time
@@ -139,7 +139,7 @@ def iterative(ref_src, mov_src, measurement=NCC, theta_range=(-45,45), \
         # rotate from previous transform
         mov = mov_src.copy()
         if total_theta != 0:
-            mov = rotate(mov_src, total_theta, reshape=False)
+            mov = rotate(mov_src, total_theta)
             mov[mov == 0] = inorm
         if im_filter != None:
             ref = im_filter(ref)
@@ -162,7 +162,7 @@ def iterative(ref_src, mov_src, measurement=NCC, theta_range=(-45,45), \
         theta_corr = []
         for theta in thetas:
             # rotate moving image, may change here if reshape=True.
-            mov_r = rotate(mov, total_theta-theta, reshape=False)
+            mov_r = rotate(mov, total_theta+theta)
             if im_filter != None:
                 mov_r = im_filter(mov_r)
             py2 = int(ref.shape[0] / 2)
@@ -178,9 +178,9 @@ def iterative(ref_src, mov_src, measurement=NCC, theta_range=(-45,45), \
         score = valfn(theta_corr)
         if compfn(score, theta_score):
             theta_score = score
-            total_theta -= delta_theta
+            total_theta += delta_theta
 
-    # print(x-px, y-py, -total_theta)
+    # print(x-px, y-py, total_theta)
     return (x-px, y-py, -total_theta)
 
 def stitch(im1, im2, **kwargs):
@@ -188,7 +188,7 @@ def stitch(im1, im2, **kwargs):
     x,y,angle = iterative(im1, im2, **kwargs)
 
     if angle != 0:
-        im2 = rotate(im2, angle, reshape=False)
+        im2 = rotate(im2, angle)
 
     im2 = crop_zeros(im2, zero=100)
     im1 = crop_zeros(im1, zero=100)
