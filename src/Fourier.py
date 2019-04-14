@@ -272,8 +272,7 @@ def Fourier(blocks):
 
     E = crop_zeros(E, zero=100)
     imwrite('../data/stitched.tif', E)
-    average_time = sum([t1,t2,t3]) / 3
-    return (E, average_time)
+    return (E, sum([t1,t2,t3]))
 
 def Frequency(blocks):
     return Fourier(blocks)

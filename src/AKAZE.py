@@ -68,5 +68,4 @@ def AKAZE(blocks):
 
     base = crop_zeros(E)
     imwrite('../data/stitched.tif', base)
-    average_time = sum([t1,t2,t3]) / (len(blocks) - 1)
-    return (base, average_time)
+    return (base, sum([t1,t2,t3]))

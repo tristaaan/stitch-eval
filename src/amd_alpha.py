@@ -5,6 +5,8 @@ import numpy as np
 import scipy as sp
 import scipy.misc
 
+from math import pi
+from time import time
 from imageio import imwrite
 from util import crop_zeros, eq_paste
 
@@ -32,7 +34,7 @@ def prepare_paste(im,x,y):
     '''
     pad an image for pasting
     '''
-    x = -int(x)
+    x = -int(x) # coordinates amd_alpha gives are reversed?
     y = -int(y)
     if y < 0:
         vert = (0, abs(y))
@@ -47,6 +49,8 @@ def prepare_paste(im,x,y):
     return np.pad(im, (vert, horz), 'constant', constant_values=(0,0))
 
 def stitch(ref_im, flo_im):
+    # start timer
+    start = time()
     ref_im_orig = ref_im.copy()
     flo_im_orig = flo_im.copy()
 
@@ -54,13 +58,14 @@ def stitch(ref_im, flo_im):
     ref_im = filters.normalize(ref_im, 0.0, None)
     flo_im = filters.normalize(flo_im, 0.0, None)
 
-    diag = 0.5 * (transforms.image_diagonal(ref_im, spacing) + transforms.image_diagonal(flo_im, spacing))
+    diag = 0.5 * (transforms.image_diagonal(ref_im, spacing) +
+                  transforms.image_diagonal(flo_im, spacing))
 
     weights1 = np.ones(ref_im.shape)
     mask1 = np.ones(ref_im.shape, 'bool')
     weights2 = np.ones(flo_im.shape)
     # mask2 = np.ones(flo_im.shape, 'bool')
-    mask2 = flo_im != 0
+    mask2 = flo_im != 0 # mask the 0 valued areas
 
     reg = amd_alpha_register(2)
 
@@ -109,8 +114,9 @@ def stitch(ref_im, flo_im):
     (transform, value) = reg.get_output(0)
     theta,y,x = transform.get_params()
     print(theta, y,x)
-    flo_im_orig = prepare_paste(flo_im_orig, x,y)
-    return (eq_paste(ref_im_orig, flo_im_orig), 10)
+    flo_im_orig = sp.ndimage.rotate(flo_im_orig, -(theta * 180) / pi)
+    flo_im_orig = prepare_paste(crop_zeros(flo_im_orig, zero=100), x,y)
+    return (eq_paste(ref_im_orig, flo_im_orig), time() - start)
 
 def amd_alpha(blocks):
     A,B,C,D = blocks
@@ -121,5 +127,4 @@ def amd_alpha(blocks):
 
     E = crop_zeros(E, zero=100)
     imwrite('../data/stitched.tif', E)
-    average_time = sum([t1,t2,t3]) / 3
-    return (E, average_time)
+    return (E, sum([t1,t2,t3]))

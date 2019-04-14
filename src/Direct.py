@@ -210,8 +210,7 @@ def iterative_generic(blocks, **kwargs):
 
     E = crop_zeros(E, zero=250)
     imwrite('../data/stitched.tif', E)
-    average_time = sum([t1,t2,t3]) / 3
-    return (E, average_time)
+    return (E, sum([t1,t2,t3]))
 
 def iterative_ssd(blocks):
     return iterative_generic(blocks, measurement=SSD)
