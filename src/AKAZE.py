@@ -9,7 +9,7 @@ from imageio import imread, imwrite
 from math import floor
 from time import time
 
-from util import paste, crop_zeros
+from util import eq_paste, crop_zeros
 
 
 def get_akaze_keypoints(im):
@@ -42,15 +42,15 @@ def stitch(im1, im2, matcher):
 
     # find the transformation given the amount of points
     M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-    h,w = im1.shape
+    h,w = im2.shape
 
     # use the homography offsets to determine the size for the stitched image
     x_offset, y_offset = M[0:2, 2]
-    new_size = (int(max(w, w+x_offset)), int(max(h, h+y_offset)))
+    new_size = (int(w+x_offset), int(h+y_offset))
 
     # warp and paste
     warped = cv2.warpAffine(im2, M[:2,:3], new_size, flags=cv2.INTER_CUBIC)
-    base = paste(im1, warped)
+    base = eq_paste(im1, warped)
     base = crop_zeros(base)
     return (base, time() - start)
 
@@ -67,6 +67,6 @@ def AKAZE(blocks):
     E,  t3 = stitch(AB, CD, bf_matcher)
 
     base = crop_zeros(E)
+    # imwrite('../data/tmp/stitched-%s.tif' % (str(time())), E)
     imwrite('../data/stitched.tif', base)
-    average_time = sum([t1,t2,t3]) / (len(blocks) - 1)
-    return (base, average_time)
+    return (base, sum([t1,t2,t3]))

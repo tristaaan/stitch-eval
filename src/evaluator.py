@@ -9,9 +9,6 @@ from imutils import resize
 from operator import mul
 
 from im_split import im_split
-from AKAZE import AKAZE
-from Direct import iterative_ssd, iterative_ncc, iterative_mi
-from Fourier import Frequency, Frequency_highpass
 from util import clamp_uint16, equalize_image
 
 
@@ -22,7 +19,7 @@ def eval_method(image_name, method, **kwargs):
     blocks = im_split(image_name, **kwargs)
     stitched, duration = method(blocks)
     if duration == None:
-        return (0, np.NAN, np.NAN)
+        return (0, np.NAN, False)
     acc_result = i_RMSE(stitched, original)
     suc_result = acc_result < 0.10
     return (duration, acc_result, suc_result)
@@ -41,7 +38,10 @@ def eval_param(image_name, method, param, data_range, downsample=False, overlap=
             kw['overlap'] = overlap
         duration, err, suc = eval_method(image_name, method, **kw)
         print("%s: %0.2f, t: %0.2f, err: %0.2f suc: %0.2f" % (param, val, duration, err, suc))
-        row.append('(%.02f, %0.02fs)' % (err, duration))
+        if suc:
+            row.append('(%.02f, %0.02fs)' % (err, duration))
+        else:
+            row.append(' -- ')
     return row
 
 
@@ -53,7 +53,7 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         rotation = True
         overlap  = True
 
-    overlap_range = [o/100 for o in range(10, 101, 10)]
+    overlap_range = [o/100 for o in range(20, 81, 10)]
 
     out = {}
     if noise:
@@ -103,7 +103,16 @@ def i_RMSE(stitched, original):
     return math.sqrt(abs_err.mean())
 
 def method_picker(name):
-    methods = [Frequency, Frequency_highpass, AKAZE, iterative_ssd, iterative_ncc, iterative_mi]
+    from AKAZE import AKAZE
+    from amd_alpha import amd_alpha
+    from Direct import iterative_ssd, iterative_ncc, iterative_mi
+    from Fourier import Frequency
+
+    methods = [AKAZE,
+        amd_alpha,
+        Frequency,
+        iterative_ssd, iterative_ncc, iterative_mi
+    ]
     method_names = list(map(lambda x: x.__name__.lower(), methods))
     return methods[method_names.index(name.lower())]
 
@@ -135,7 +144,8 @@ if __name__ == '__main__':
     for k in results.keys():
         print(results[k])
         if kw['output']:
-            latex_str = results[k].to_latex()
+            latex_str = results[k].to_latex() \
+                                  .replace('°', '\\degree') # usepackage{gensymb}
             with open('%s_%s.tex' % (method, k), 'w') as fi:
                 caption = '%s results for %s method.' % (k, method)
                 if kw['downsample']:

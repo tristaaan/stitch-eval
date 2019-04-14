@@ -1,5 +1,22 @@
 import numpy as np
 
+def pad(im,x,y):
+    '''
+    pad an image for pasting
+    '''
+    x = int(x)
+    y = int(y)
+    if y < 0:
+        vert = (0, abs(y))
+    else:
+        vert = (y, 0)
+
+    if x < 0:
+        horz = (0, abs(x))
+    else:
+        horz = (x, 0)
+
+    return np.pad(im, (vert, horz), 'constant', constant_values=(0,0))
 
 def paste(canvas, paint):
     '''
