@@ -96,7 +96,7 @@ def F_stitch(im1, im2):
     # find the x,y translation
     im2_orig = im2.copy()
     im1, im2 = bounds_equalize(im1, im2)
-    impulse = ifft2(phase_correlation(im1, im2, whiten=False))
+    impulse = ifft2(phase_correlation(im1, im2))
     y,x = np.unravel_index(np.argmax(impulse), impulse.shape)
 
     # prepare the image to be pasted
