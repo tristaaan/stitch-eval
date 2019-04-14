@@ -144,7 +144,8 @@ if __name__ == '__main__':
     for k in results.keys():
         print(results[k])
         if kw['output']:
-            latex_str = results[k].to_latex()
+            latex_str = results[k].to_latex() \
+                                  .replace('°', '\\degree') # usepackage{gensymb}
             with open('%s_%s.tex' % (method, k), 'w') as fi:
                 caption = '%s results for %s method.' % (k, method)
                 if kw['downsample']:
