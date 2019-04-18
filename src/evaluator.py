@@ -7,25 +7,51 @@ import pandas as pd
 from imageio import imread, imwrite
 from imutils import resize
 from operator import mul
+from time import time
 
 from im_split import im_split
-from util import clamp_uint16, equalize_image
+from Fiducials import Fiducial_corners, group_transform
 
 
-def eval_method(image_name, method, **kwargs):
+def build_fiducials(initial, transforms):
+    A = initial[0]
+    B = initial[1].transform(*transforms[0])
+    C = initial[2]
+    D = initial[3].transform(*transforms[1])
+    temp_center = (max(f.max_x() for f in [A,B,C,D]) // 2,
+                   max(f.max_y() for f in [A,B,C,D]) // 2)
+    group_transform([C,D], *transforms[2], unit='d', temp_center=temp_center)
+    return [A,B,C,D]
+
+def eval_method(image_name, method, debug=False, **kwargs):
+    '''
+    Evaluate image stitching given an image, a method, and the splitting params
+    '''
     original = imread(image_name)
     if kwargs['downsample'] > 0:
         original = resize(original, width=kwargs['downsample'])
-    blocks = im_split(image_name, **kwargs)
-    stitched, duration = method(blocks)
+    blocks, ground_truth, initial = im_split(image_name, fiducials=True, **kwargs)
+    stitched, transforms, duration = method(blocks)
+    # there was a catastrophic failure
     if duration == None:
         return (0, np.NAN, False)
-    acc_result = i_RMSE(stitched, original)
-    suc_result = acc_result < 0.10
+    # if debug, write the stitched image.
+    if debug:
+        imwrite('../data/tmp/%s_%d_%s.tif' %
+                (method.__name__,int(kwargs['overlap']*100), str(time())), stitched)
+    # with the transformations, construct fiducials
+    est_fiducials = build_fiducials(initial, transforms)
+    # compare the estimated ones with the ground_truth ones.
+    acc_result = fiducial_error(ground_truth, est_fiducials)
+    suc_result = acc_result < 100
     return (duration, acc_result, suc_result)
 
 
-def eval_param(image_name, method, param, data_range, downsample=False, overlap=0.2):
+def eval_param(image_name, method, param, data_range, overlap=0.2,
+               downsample=False, debug=False):
+    '''
+    Run a study on a method given a single range of parameters with overlap
+    '''
     row = []
     if param != 'overlap':
         print('%s: %s, overlap: %0.2f' % (method.__name__, param, overlap))
@@ -33,20 +59,24 @@ def eval_param(image_name, method, param, data_range, downsample=False, overlap=
         print('%s: %s, overlap: %0.2f' % (method.__name__, param, data_range[0]))
 
     for val in data_range:
-        kw = { param: val, 'downsample': downsample, }
+        kw = { param: val, 'downsample': downsample, 'debug': debug }
         if param != 'overlap':
             kw['overlap'] = overlap
         duration, err, suc = eval_method(image_name, method, **kw)
         print("%s: %0.2f, t: %0.2f, err: %0.2f suc: %0.2f" % (param, val, duration, err, suc))
-        if suc:
-            row.append('(%.02f, %0.02fs)' % (err, duration))
-        else:
-            row.append(' -- ')
+        # if suc:
+        row.append('(%.02f, %0.02fs)' % (err, duration))
+        # else:
+            # row.append(' -- ')
     return row
 
 
 def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
              downsample=False, **kwargs):
+    '''
+    Run a study on a method with a variety of parameters:
+    overlap + [noise, rotation]
+    '''
     # if no arguments are provided all are run.
     if not noise and not rotation and not overlap:
         noise    = True
@@ -56,24 +86,25 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
     overlap_range = [o/100 for o in range(20, 81, 10)]
 
     out = {}
+    kw = {'downsample': downsample, 'debug': kwargs['debug']}
     if noise:
-        noise_range = [d / 100 for d in range(0,11,2)]
+        noise_range = [d / 1000 for d in range(0,51,10)]
         table = []
         for o in overlap_range:
-            kw = {'overlap': o, 'downsample': downsample}
+            kw['overlap'] = o
             table.append(eval_param(image_name, method, 'noise', noise_range, **kw))
 
         df = pd.DataFrame(table, columns=noise_range, index=overlap_range)
         df.index.names = ['overlap']
         df.columns.names = ['noise']
-        df.columns = map(lambda x: '%.02fdb' % (x), noise_range)
+        df.columns = map(lambda x: '%.03f' % (x), noise_range)
         out['noise'] = df
 
     if rotation:
         rot_range = range(-45,46,15)
         table = []
         for o in overlap_range:
-            kw = {'overlap': o, 'downsample': downsample}
+            kw['overlap'] = o
             table.append(eval_param(image_name, method, 'rotation',
                                     rot_range, **kw))
         df = pd.DataFrame(table, columns=rot_range, index=overlap_range)
@@ -83,7 +114,8 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         out['rotation'] = df
 
     if overlap:
-        table = eval_param(image_name, method, 'overlap', overlap_range, downsample)
+        del kw['overlap']
+        table = eval_param(image_name, method, 'overlap', overlap_range, **kw)
         df = pd.DataFrame(table).transpose()
         df.index.names = ['overlap']
         df.columns = map(lambda x: '%.0f%%' % (x*100), overlap_range)
@@ -91,16 +123,36 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
 
     return out
 
-def i_RMSE(stitched, original):
-    oh,ow = original.shape
-    # make sure these are the same size.
-    if stitched.shape[0] != oh or stitched.shape[1] != ow:
-        stitched = equalize_image(stitched, original.shape)
+def dist(p1, p2):
+    L2 = (p1.x - p2.x)**2 + (p1.y - p2.y)**2
+    return math.sqrt(L2)
 
-    stitched = stitched.astype('float64') / (2**16 -1)
-    original = original.astype('float64') / (2**16 -1)
-    abs_err = (original - stitched) ** 2
-    return math.sqrt(abs_err.mean())
+def corner_distances(fgroup):
+    '''
+    given a fiducial group calculate the distances between corresponding corners
+    '''
+    labels = ['A', 'B', 'C', 'D']
+    g = dict(zip(labels, fgroup))
+    ab1 = dist(g['A'].tr, g['B'].tl)
+    ab2 = dist(g['A'].br, g['B'].bl)
+
+    ac1 = dist(g['A'].bl, g['C'].tl)
+    ac2 = dist(g['A'].br, g['C'].tr)
+
+    cd1 = dist(g['C'].tr, g['D'].tl)
+    cd2 = dist(g['C'].br, g['D'].bl)
+
+    bd1 = dist(g['B'].bl, g['D'].tl)
+    bd2 = dist(g['B'].br, g['D'].tr)
+    return [ab1, ab2, ac1, ac2, cd1, cd2, bd1, bd2]
+
+def fiducial_error(gt, est):
+    '''
+    Compare ground truth fiducials with estimated using total registration error
+    '''
+    gt_dist = corner_distances(gt)
+    est_dist = corner_distances(est)
+    return abs(np.subtract(gt_dist, est_dist)).sum()
 
 def method_picker(name):
     from AKAZE import AKAZE
@@ -130,6 +182,7 @@ if __name__ == '__main__':
     parser.add_argument('-method', '-m',     help='method to evaluate', type=str, default='akaze')
     parser.add_argument('-downsample', '-ds', help='downsample images', type=int, default='-1')
     parser.add_argument('-output', '-o', action='store_true', help='output results to LaTeX table')
+    parser.add_argument('-debug', action='store_true', help='write the stitched image after each stitch')
 
     args = parser.parse_args()
     kw = vars(args)
@@ -147,7 +200,8 @@ if __name__ == '__main__':
             latex_str = results[k].to_latex() \
                                   .replace('°', '\\degree') # usepackage{gensymb}
             with open('%s_%s.tex' % (method, k), 'w') as fi:
-                caption = '%s results for %s method.' % (k, method)
+                caption = '%s results for %s method.' % (k[0].upper() + k[1:],
+                                                         method).replace('_', '\\_')
                 if kw['downsample']:
                     ds = kw['downsample']
                     caption += ' Base image downsampled to $%d\\times%d$ pixels.' % (ds, ds)
