@@ -141,3 +141,11 @@ def bounds_equalize(target, ref):
         target = np.pad(target, ((0,py),(0,px)), 'constant', constant_values=(0,0))
 
     return target, ref
+
+def square_off(im):
+    which_side = np.argmin(im.shape) # adjust this side
+    new_len = max(im.shape)
+    diff = new_len - im.shape[which_side]
+    yx = [0,0]
+    yx[which_side] = diff
+    return pad(im, *yx[::-1])
