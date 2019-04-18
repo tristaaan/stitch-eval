@@ -181,7 +181,7 @@ def iterative(ref_src, mov_src, measurement=NCC, theta_range=(-45,45), \
             total_theta += delta_theta
 
     # print(x-px, y-py, total_theta)
-    return (x-px, y-py, -total_theta)
+    return (x-px, y-py, total_theta)
 
 def stitch(im1, im2, **kwargs):
     start = time()
@@ -209,7 +209,6 @@ def iterative_generic(blocks, **kwargs):
     E,  t3 = stitch(AB, CD, **kwargs)
 
     E = crop_zeros(E, zero=250)
-    imwrite('../data/stitched.tif', E)
     return (E, sum([t1,t2,t3]))
 
 def iterative_ssd(blocks):

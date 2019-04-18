@@ -96,18 +96,18 @@ def stitch(ref_im, flo_im):
     # transform in the format theta, y, x
     (transform, value) = reg.get_output(0)
     theta,y,x = transform.get_params()
-    print(theta, y,x)
-    flo_im_orig = rotate(flo_im_orig, (theta * 180) / pi)
+    angle = (theta * 180) / pi
+    # print(angle, y,x)
+    flo_im_orig = rotate(flo_im_orig, angle)
     flo_im_orig = pad(crop_zeros(flo_im_orig, zero=100), -x,-y)
-    return (eq_paste(ref_im_orig, flo_im_orig), time() - start)
+    return (eq_paste(ref_im_orig, flo_im_orig), [x,y,angle], time() - start)
 
 def amd_alpha(blocks):
     A,B,C,D = blocks
 
-    AB, t1 = stitch(A, B)
-    CD, t2 = stitch(C, D)
-    E,  t3 = stitch(AB, CD)
+    AB, M1, t1 = stitch(A, B)
+    CD, M2, t2 = stitch(C, D)
+    E,  M3, t3 = stitch(AB, CD)
 
     E = crop_zeros(E, zero=100)
-    imwrite('../data/stitched.tif', E)
-    return (E, sum([t1,t2,t3]))
+    return (E, [M1, M2, M3], sum([t1,t2,t3]))
