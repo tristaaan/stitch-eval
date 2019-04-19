@@ -10,17 +10,34 @@ from operator import mul
 from time import time
 
 from im_split import im_split
-from Fiducials import Fiducial_corners, group_transform
+from Fiducials import Fiducial_corners, group_transform, group_transform_affine
 
 
-def build_fiducials(initial, transforms):
+def build_fiducials(initial, transforms, affine=False):
+    '''
+    Given initial fiducials and transformations from the stitching process
+    apply transformations to initial fiducials.
+    '''
+    # no transforms to reference images
     A = initial[0]
-    B = initial[1].transform(*transforms[0])
     C = initial[2]
-    D = initial[3].transform(*transforms[1])
-    temp_center = (max(f.max_x() for f in [A,B,C,D]) // 2,
-                   max(f.max_y() for f in [A,B,C,D]) // 2)
-    group_transform([C,D], *transforms[2], unit='d', temp_center=temp_center)
+
+    # transform moving images
+    if affine:
+        B = initial[1].transform_affine(transforms[0])
+        D = initial[3].transform_affine(transforms[1])
+    else:
+        B = initial[1].transform(*transforms[0])
+        D = initial[3].transform(*transforms[1])
+
+    # get the center point of moving image CD
+    temp_center = (max(f.max_x() for f in [C,D]) // 2,
+                   max(f.max_y() for f in [C,D]) // 2)
+    # transform CD
+    if affine:
+        group_transform_affine([C,D], transforms[2], temp_center=temp_center)
+    else:
+        group_transform([C,D], *transforms[2], unit='d', temp_center=temp_center)
     return [A,B,C,D]
 
 def eval_method(image_name, method, debug=False, **kwargs):
@@ -35,15 +52,17 @@ def eval_method(image_name, method, debug=False, **kwargs):
     # there was a catastrophic failure
     if duration == None:
         return (0, np.NAN, False)
+    # with the transformations, construct estimated fiducials
+    est_fiducials = build_fiducials(initial, transforms, \
+                                    affine=hasattr(transforms[0],'shape'))
+    # compare the estimated ones with the ground_truth ones.
+    acc_result = fiducial_point_error(ground_truth, est_fiducials)
+    suc_result = acc_result < 100
     # if debug, write the stitched image.
     if debug:
-        imwrite('../data/tmp/%s_%d_%s.tif' %
-                (method.__name__,int(kwargs['overlap']*100), str(time())), stitched)
-    # with the transformations, construct fiducials
-    est_fiducials = build_fiducials(initial, transforms)
-    # compare the estimated ones with the ground_truth ones.
-    acc_result = fiducial_error(ground_truth, est_fiducials)
-    suc_result = acc_result < 100
+        imwrite('../data/tmp/%s_%d_%.02f.tif' %
+                (method.__name__, int(kwargs['overlap']*100), acc_result),
+                stitched)
     return (duration, acc_result, suc_result)
 
 
@@ -64,10 +83,7 @@ def eval_param(image_name, method, param, data_range, overlap=0.2,
             kw['overlap'] = overlap
         duration, err, suc = eval_method(image_name, method, **kw)
         print("%s: %0.2f, t: %0.2f, err: %0.2f suc: %0.2f" % (param, val, duration, err, suc))
-        # if suc:
         row.append('(%.02f, %0.02fs)' % (err, duration))
-        # else:
-            # row.append(' -- ')
     return row
 
 
@@ -83,7 +99,7 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         rotation = True
         overlap  = True
 
-    overlap_range = [o/100 for o in range(20, 81, 10)]
+    overlap_range = [o/100 for o in range(50, 81, 10)]
 
     out = {}
     kw = {'downsample': downsample, 'debug': kwargs['debug']}
@@ -114,7 +130,6 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         out['rotation'] = df
 
     if overlap:
-        del kw['overlap']
         table = eval_param(image_name, method, 'overlap', overlap_range, **kw)
         df = pd.DataFrame(table).transpose()
         df.index.names = ['overlap']
@@ -127,7 +142,7 @@ def dist(p1, p2):
     L2 = (p1.x - p2.x)**2 + (p1.y - p2.y)**2
     return math.sqrt(L2)
 
-def corner_distances(fgroup):
+def edge_distances(fgroup):
     '''
     given a fiducial group calculate the distances between corresponding corners
     '''
@@ -146,13 +161,29 @@ def corner_distances(fgroup):
     bd2 = dist(g['B'].br, g['D'].tr)
     return [ab1, ab2, ac1, ac2, cd1, cd2, bd1, bd2]
 
-def fiducial_error(gt, est):
+def fiducial_edge_error(gt, est):
     '''
-    Compare ground truth fiducials with estimated using total registration error
+    Compare edge distances, rotation invariant
     '''
-    gt_dist = corner_distances(gt)
-    est_dist = corner_distances(est)
+    gt_dist = edge_distances(gt)
+    est_dist = edge_distances(est)
     return abs(np.subtract(gt_dist, est_dist)).sum()
+
+def fiducial_point_error(gt, est):
+    '''
+    total registration error
+    '''
+    labels = ['A', 'B', 'C', 'D']
+    g = dict(zip(labels, gt))
+    e = dict(zip(labels, est))
+    err = 0
+    for l in labels[1:]: # the first points' error will always be 0
+        diff = dist(g[l].tl, e[l].tl) + \
+            dist(g[l].tr, e[l].tr) + \
+            dist(g[l].br, e[l].br) + \
+            dist(g[l].bl, e[l].bl)
+        err += diff
+    return err # / 12 uncomment for average error.
 
 def method_picker(name):
     from AKAZE import AKAZE

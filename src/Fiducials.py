@@ -15,7 +15,7 @@ class Point(object):
 
 
 class Fiducial_corners(object):
-    def __init__(self, shape, initial_transform=None):
+    def __init__(self, shape, initial_transform=None, unit='radians'):
         h,w = shape
         self.center = Point(w//2, h//2)
         self.corners = []
@@ -26,7 +26,10 @@ class Fiducial_corners(object):
 
         self.reassign_pts()
         if initial_transform:
-            self.transform(*initial_transform)
+            self.transform(*initial_transform, unit=unit)
+
+    def __repr__(self):
+        return str(self.corners)
 
     def min_x(self):
         return min(c.x for c in self.corners)
@@ -94,6 +97,30 @@ class Fiducial_corners(object):
         self.reassign_pts()
         return self
 
+    def transform_affine(self, M, temp_center=None):
+        '''
+        Transform the corners by affine matrix M
+        (M already accounts for center offsets unlike the other transform func)
+        '''
+        if M.shape[0] < 3:
+            M = np.vstack([M, [0,0,1]])
+        if temp_center:
+            cx,cy = temp_center
+        else:
+            cx,cy = self.center
+        new_corners = []
+        for pt in self.corners:
+            x,y = pt
+            # transform
+            v = np.array([x,y,1])
+            res = np.matmul(M, v)
+            nx, ny = res[:2]
+            new_corners.append(Point(nx,ny))
+        self.corners = new_corners
+        self.reassign_pts()
+        return self
+
+
 def group_transform(group, _x, _y, theta, temp_center=None, unit='radians'):
     min_x = np.inf
     min_y = np.inf
@@ -107,3 +134,11 @@ def group_transform(group, _x, _y, theta, temp_center=None, unit='radians'):
     min_y *= -1
     for f in group:
         f.transform(_x+min_x, _y+min_y, 0)
+
+
+def group_transform_affine(group, M, temp_center=None):
+    for f in group:
+        f.transform_affine(M, temp_center=temp_center)
+        for c in f.corners:
+            mx,my = c
+

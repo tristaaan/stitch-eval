@@ -42,10 +42,10 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, \
         stride = base_block - overlap_p
     else:
         base_block = width / rows
-        ratio = overlap # decrease the denominator, 3/4 -> 1/3
+        ratio = overlap
         overlap_p = base_block * ratio
         output_w = base_block + overlap_p
-        output_h = output_w # assumes image is square
+        output_h = output_w
         stride = base_block- overlap_p
 
     output_images = []
@@ -80,7 +80,8 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, \
             ground_truth_corners.append(Fiducial_corners(base_shape,
                                         initial_transform=[c_start, r_start, 0]))
             initial_corners.append(Fiducial_corners(base_shape,
-                                        initial_transform=[0,0,rotation]))
+                                        initial_transform=[0,0,rotation],
+                                        unit='d'))
 
     if fiducials:
         return output_images, ground_truth_corners, initial_corners

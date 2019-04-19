@@ -47,12 +47,13 @@ def stitch(im1, im2, matcher):
     # use the homography offsets to determine the size for the stitched image
     x_offset, y_offset = M[0:2, 2]
     new_size = (int(w+x_offset), int(h+y_offset))
+    affine_M = M[:2,:3]
 
     # warp and paste
-    warped = cv2.warpAffine(im2, M[:2,:3], new_size, flags=cv2.INTER_CUBIC)
+    warped = cv2.warpAffine(im2, affine_M, new_size, flags=cv2.INTER_CUBIC)
     base = eq_paste(im1, warped)
     base = crop_zeros(base)
-    return (base, M, time() - start)
+    return (base, affine_M, time() - start)
 
 
 def AKAZE(blocks):
@@ -63,7 +64,7 @@ def AKAZE(blocks):
     AB, M1, t1 = stitch(A, B, bf_matcher)
     CD, M2, t2 = stitch(C, D, bf_matcher)
     if t1 == None or t2 == None:
-        return (None, None)
+        return (None, None, None)
     E, M3, t3 = stitch(AB, CD, bf_matcher)
 
     base = crop_zeros(E)
