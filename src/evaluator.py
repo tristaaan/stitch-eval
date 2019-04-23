@@ -1,16 +1,47 @@
 import argparse
 import math
-import random
+import copy
+import gc
+
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from imageio import imread, imwrite
 from imutils import resize
-from operator import mul
-from time import time
 
 from im_split import im_split
 from Fiducials import Fiducial_corners, group_transform, group_transform_affine
+
+def saveimfids(fname, im, fids, truthy=[]):
+    '''
+    plot fiducial markers on the stitched image
+    '''
+    fig, a = plt.subplots(1, 1, figsize=(4, 5))
+    colors = ['ro', 'co', 'bo', 'yo']
+    a.imshow(im, cmap='gray')
+    # offset fiducial markers for visualization
+    offset_x, offset_y = (0,0)
+    min_x = min(f.min_x() for f in fids)
+    min_y = min(f.min_y() for f in fids)
+    if min_x < 0:
+        offset_x = -1 * min_x
+    if min_y < 0:
+        offset_y = -1 * min_y
+    # draw them on the plot
+    for i,fid in enumerate(fids):
+        fid.transform(offset_x, offset_y, 0)
+        for c in fid.corners:
+            x,y = c
+            a.plot(x,y, colors[i])
+    for fid in truthy:
+        for c in fid.corners:
+            x,y = c
+            a.plot(x,y, 'w*')
+    plt.savefig(fname)
+    a.cla()
+    fig.clf()
+    plt.close(fig)
 
 
 def build_fiducials(initial, transforms, affine=False):
@@ -27,28 +58,31 @@ def build_fiducials(initial, transforms, affine=False):
         B = initial[1].transform_affine(transforms[0])
         D = initial[3].transform_affine(transforms[1])
     else:
-        B = initial[1].transform(*transforms[0])
-        D = initial[3].transform(*transforms[1])
+        B = initial[1].transform(*transforms[0], unit='d')
+        D = initial[3].transform(*transforms[1], unit='d')
 
     # get the center point of moving image CD
-    temp_center = (max(f.max_x() for f in [C,D]) // 2,
-                   max(f.max_y() for f in [C,D]) // 2)
+    min_x = min(f.min_x() for f in [C,D])
+    max_x = max(f.max_x() for f in [C,D])
+
+    min_y = min(f.min_y() for f in [C,D])
+    max_y = max(f.max_y() for f in [C,D])
+
+    temp_center = (max_x - (max_x-min_x) / 2, max_y - (max_y-min_y) / 2)
     # transform CD
     if affine:
         group_transform_affine([C,D], transforms[2], temp_center=temp_center)
     else:
         group_transform([C,D], *transforms[2], unit='d', temp_center=temp_center)
-    return [A,B,C,D]
+    return [A, B, C, D]
 
 def eval_method(image_name, method, debug=False, **kwargs):
     '''
     Evaluate image stitching given an image, a method, and the splitting params
     '''
-    original = imread(image_name)
-    if kwargs['downsample'] > 0:
-        original = resize(original, width=kwargs['downsample'])
     blocks, ground_truth, initial = im_split(image_name, fiducials=True, **kwargs)
     stitched, transforms, duration = method(blocks)
+
     # there was a catastrophic failure
     if duration == None:
         return (0, np.NAN, False)
@@ -60,9 +94,11 @@ def eval_method(image_name, method, debug=False, **kwargs):
     suc_result = acc_result < 100
     # if debug, write the stitched image.
     if debug:
-        imwrite('../data/tmp/%s_%d_%.02f.tif' %
-                (method.__name__, int(kwargs['overlap']*100), acc_result),
-                stitched)
+        print(transforms[2])
+        fname = '../data/tmp/%s_%d_%.02f.tif' % \
+                (method.__name__, int(kwargs['overlap']*100), acc_result)
+        saveimfids(fname, stitched, copy.deepcopy(est_fiducials))#, truthy=ground_truth)
+        gc.collect() # cleans up matplot lib junk
     return (duration, acc_result, suc_result)
 
 
@@ -79,6 +115,7 @@ def eval_param(image_name, method, param, data_range, overlap=0.2,
 
     for val in data_range:
         kw = { param: val, 'downsample': downsample, 'debug': debug }
+        # print(kw)
         if param != 'overlap':
             kw['overlap'] = overlap
         duration, err, suc = eval_method(image_name, method, **kw)
@@ -99,7 +136,8 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         rotation = True
         overlap  = True
 
-    overlap_range = [o/100 for o in range(50, 81, 10)]
+    # overlap_range = [o/100 for o in range(20, 81, 10)]
+    overlap_range = [0.30]
 
     out = {}
     kw = {'downsample': downsample, 'debug': kwargs['debug']}
@@ -117,12 +155,14 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         out['noise'] = df
 
     if rotation:
-        rot_range = range(-45,46,15)
+        # rot_range = range(-30,31,15)
+        rot_range = [0, 15, 0]
+
         table = []
         for o in overlap_range:
             kw['overlap'] = o
-            table.append(eval_param(image_name, method, 'rotation',
-                                    rot_range, **kw))
+            row = eval_param(image_name, method, 'rotation', rot_range, **kw)
+            table.append(row)
         df = pd.DataFrame(table, columns=rot_range, index=overlap_range)
         df.index.names = ['overlap']
         df.columns.names = ['rotation']

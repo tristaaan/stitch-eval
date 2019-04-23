@@ -13,6 +13,17 @@ class Point(object):
     def __repr__(self):
         return '(%f,%f)' % (self.x, self.y)
 
+    def __add__(self, pt):
+        if isinstance(pt, Point):
+            self.x += pt.x
+            self.y += pt.y
+        elif isinstance(pt, tuple):
+            self.x += pt[0]
+            self.y += pt[1]
+        else:
+            raise ValueError('cannot add pt')
+        return self
+
 
 class Fiducial_corners(object):
     def __init__(self, shape, initial_transform=None, unit='radians'):
@@ -26,7 +37,7 @@ class Fiducial_corners(object):
 
         self.reassign_pts()
         if initial_transform:
-            self.transform(*initial_transform, unit=unit)
+            self.transform(*initial_transform, unit=unit, zero_out=True)
 
     def __repr__(self):
         return str(self.corners)
@@ -52,7 +63,7 @@ class Fiducial_corners(object):
         self.br = self.corners[2]
         self.bl = self.corners[3]
 
-    def transform(self, _x, _y, theta, unit='radians', temp_center=None):
+    def transform(self, _x, _y, theta, unit='radians', temp_center=None, zero_out=False):
         if unit[0] == 'd':
             theta = theta * math.pi/180
         if temp_center:
@@ -62,8 +73,6 @@ class Fiducial_corners(object):
         new_corners = []
         # rotate
         if theta != 0:
-            min_x = np.inf
-            min_y = np.inf
             for pt in self.corners:
                 nx, ny = pt
                 cos_t = math.cos(theta)
@@ -78,15 +87,12 @@ class Fiducial_corners(object):
                 nx += cx
                 ny += cy
                 new_corners.append(Point(nx,ny))
-                min_x = min(nx, min_x)
-                min_y = min(ny, min_y)
-            # the points should not be less than 0
-            if not temp_center:
-                _x += -1 * min_x
-                _y += -1 * min_y
             self.corners = new_corners
         # translate
         new_corners = []
+        if zero_out:
+            _x -= self.min_x()
+            _y -= self.min_y()
         for pt in self.corners:
             nx = pt.x + _x
             ny = pt.y + _y
@@ -121,24 +127,12 @@ class Fiducial_corners(object):
         return self
 
 
-def group_transform(group, _x, _y, theta, temp_center=None, unit='radians'):
-    min_x = np.inf
-    min_y = np.inf
+def group_transform(group, _x, _y, theta, unit='radians', temp_center=None):
     for f in group:
-        f.transform(0, 0, theta, unit=unit, temp_center=temp_center)
-        for c in f.corners:
-            mx,my = c
-            min_x = min(mx, min_x)
-            min_y = min(my, min_y)
-    min_x *= -1
-    min_y *= -1
-    for f in group:
-        f.transform(_x+min_x, _y+min_y, 0)
+        f.transform(_x, _y, theta, unit=unit, temp_center=temp_center)
 
 
 def group_transform_affine(group, M, temp_center=None):
     for f in group:
         f.transform_affine(M, temp_center=temp_center)
-        for c in f.corners:
-            mx,my = c
 
