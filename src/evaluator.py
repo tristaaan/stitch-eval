@@ -11,7 +11,9 @@ from imageio import imread, imwrite
 from imutils import resize
 
 from im_split import im_split
-from Fiducials import Fiducial_corners, group_transform, group_transform_affine
+from Fiducials import Fiducial_corners, group_transform, \
+                      group_transform_affine, zero_group
+
 
 def saveimfids(fname, im, fids, truthy=[]):
     '''
@@ -60,6 +62,9 @@ def build_fiducials(initial, transforms, affine=False):
     else:
         B = initial[1].transform(*transforms[0], unit='d')
         D = initial[3].transform(*transforms[1], unit='d')
+        # keep cd coordinates relative
+        zero_group([C,D])
+
 
     # get the center point of moving image CD
     min_x = min(f.min_x() for f in [C,D])
@@ -73,7 +78,11 @@ def build_fiducials(initial, transforms, affine=False):
     if affine:
         group_transform_affine([C,D], transforms[2], temp_center=temp_center)
     else:
-        group_transform([C,D], *transforms[2], unit='d', temp_center=temp_center)
+        x,y,th = transforms[2]
+        print(A.min_x(), B.min_x(), A.min_y(), B.min_y())
+        x += B.min_x() if round(B.min_x()) <= round(A.min_x()) else 0
+        y += B.min_y() if round(B.min_y()) <= round(A.min_y()) else 0
+        group_transform([C,D], x,y,th , unit='d', temp_center=temp_center)
     return [A, B, C, D]
 
 def eval_method(image_name, method, debug=False, **kwargs):
@@ -94,7 +103,7 @@ def eval_method(image_name, method, debug=False, **kwargs):
     suc_result = acc_result < 100
     # if debug, write the stitched image.
     if debug:
-        print(transforms[2])
+        print(transforms[0], transforms[1], transforms[2])
         fname = '../data/tmp/%s_%d_%.02f.tif' % \
                 (method.__name__, int(kwargs['overlap']*100), acc_result)
         saveimfids(fname, stitched, copy.deepcopy(est_fiducials))#, truthy=ground_truth)
@@ -155,8 +164,8 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         out['noise'] = df
 
     if rotation:
-        # rot_range = range(-30,31,15)
-        rot_range = [0, 15, 0]
+        rot_range = range(-30,31,15)
+        # rot_range = [0, 15, 0]
 
         table = []
         for o in overlap_range:

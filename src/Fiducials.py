@@ -71,7 +71,7 @@ class Fiducial_corners(object):
         else:
             cx,cy = self.center
         new_corners = []
-        # rotate
+        # rotate around center
         if theta != 0:
             for pt in self.corners:
                 nx, ny = pt
@@ -126,6 +126,15 @@ class Fiducial_corners(object):
         self.reassign_pts()
         return self
 
+def zero_group(group):
+    min_x = min(f.min_x() for f in group)
+    min_y = min(f.min_y() for f in group)
+    tx,ty = (0,0)
+    if min_x < 0:
+        tx -= min_x
+    if min_y < 0:
+        ty -= min_y
+    group_transform(group, tx, ty, 0)
 
 def group_transform(group, _x, _y, theta, unit='radians', temp_center=None):
     for f in group:
