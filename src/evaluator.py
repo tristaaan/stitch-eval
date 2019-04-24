@@ -79,7 +79,6 @@ def build_fiducials(initial, transforms, affine=False):
         group_transform_affine([C,D], transforms[2], temp_center=temp_center)
     else:
         x,y,th = transforms[2]
-        print(A.min_x(), B.min_x(), A.min_y(), B.min_y())
         x += B.min_x() if round(B.min_x()) <= round(A.min_x()) else 0
         y += B.min_y() if round(B.min_y()) <= round(A.min_y()) else 0
         group_transform([C,D], x,y,th , unit='d', temp_center=temp_center)

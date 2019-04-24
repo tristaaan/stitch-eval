@@ -6,9 +6,9 @@ import numpy as np
 from math import pi
 from time import time
 from imageio import imwrite
-from imutils import rotate_bound as rotate
+from imutils import rotate_bound
 
-from util import crop_zeros, eq_paste, pad
+from util import crop_zeros, merge, tuple_sub
 
 sys.path.insert(0, 'py_alpha_amd_release/')
 import py_alpha_amd_release.filters as filters
@@ -96,11 +96,18 @@ def stitch(ref_im, flo_im):
     # transform in the format theta, y, x
     (transform, value) = reg.get_output(0)
     theta,y,x = transform.get_params()
-    angle = (theta * 180) / pi
+    angle = (theta * pi) / 180
     # print(angle, y,x)
-    flo_im_orig = rotate(flo_im_orig, angle)
-    flo_im_orig = pad(crop_zeros(flo_im_orig, zero=100), -x,-y)
-    return (eq_paste(ref_im_orig, flo_im_orig), [x,y,angle], time() - start)
+    pre_size = flo_im_orig.shape
+    flo_im_orig = rotate_bound(flo_im_orig, angle)
+    post_size = flo_im_orig.shape
+    flo_im_orig, (ty,_,tx,_) = crop_zeros(flo_im_orig, zero=100, crop_vals=True)
+    rot_diff = tuple_sub(post_size,pre_size)
+
+    base = merge(ref_im_orig, flo_im_orig, -x,-y)
+    x -= tx - rot_diff[1] // 2
+    y -= ty - rot_diff[0] // 2
+    return (base, [-x,-y,angle], time() - start)
 
 def amd_alpha(blocks):
     A,B,C,D = blocks
