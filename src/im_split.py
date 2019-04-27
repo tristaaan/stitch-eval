@@ -32,21 +32,15 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, \
     output_w = 0
     output_h = 0
 
-    # these ratios are tricky
-    if overlap <= 0.5:
-        base_block = width / rows
-        ratio = 1/((1/overlap) + 1) # increase the denominator 1/2 -> 1/3
-        overlap_p = base_block * ratio
-        output_w = base_block + overlap_p
-        output_h = output_w # assumes image is square
-        stride = base_block - overlap_p
-    else:
-        base_block = width / rows
-        ratio = overlap
-        overlap_p = base_block * ratio
-        output_w = base_block + overlap_p
-        output_h = output_w
-        stride = base_block- overlap_p
+    if blocks > 4:
+        raise NotImplementedError('Number of blocks > 4 not yet supported. \
+                                  (all tiles will not be the same size)')
+
+    # block_side = L / 2-p
+    base_block = width / rows
+    output_w = width  / (2 - overlap)
+    output_h = height / (2 - overlap)
+    stride = output_w - (output_w - base_block)*2 # assumes square
 
     output_images = []
     ground_truth_corners = [] # ground truth to compare to
