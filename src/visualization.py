@@ -1,5 +1,4 @@
 import re
-import pdb
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -53,8 +52,10 @@ def retabulate(table, param):
   return flat
 
 def plot_results(fname, results, param):
+  '''
+  visualize results in a seaborn annotated heatmap
+  '''
   sns.set()
-  # pdb.set_trace()
   reformatted = retabulate(results, param)
   reformatted.head()
   reformatted = reformatted.pivot('overlap', param, 'error')

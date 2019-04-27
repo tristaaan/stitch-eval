@@ -1,18 +1,16 @@
 import argparse
-import math
 import copy
 import gc
+import math
+import os
 
 import numpy as np
 import pandas as pd
 
-from imageio import imread, imwrite
-from imutils import resize
-
 from im_split import im_split
 from Fiducials import Fiducial_corners, group_transform, \
                       group_transform_affine, zero_group
-from vizualization import saveimfids, plot_results
+from visualization import saveimfids, plot_results
 
 def build_fiducials(initial, transforms, affine=False):
     '''
@@ -131,7 +129,7 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         out['noise'] = df
 
     if rotation:
-        rot_range = range(-45,46,5)
+        rot_range = range(-60,61,10)
         # rot_range = [0, 15, 0]
 
         table = []
@@ -216,6 +214,12 @@ def method_picker(name):
     return methods[method_names.index(name.lower())]
 
 
+def make_results_folder(name):
+    try:
+        os.mkdir(name)
+    except FileExistsError:
+        pass
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run evaluations with a method')
     # eval parameters
@@ -230,7 +234,7 @@ if __name__ == '__main__':
     parser.add_argument('-downsample', '-ds', help='downsample images', type=int, default='-1')
     parser.add_argument('-output', '-o', action='store_true', help='output results to LaTeX table')
     parser.add_argument('-debug', action='store_true', help='write the stitched image after each stitch')
-    parser.add_argument('-viz', action='store_true', help='create a heatmap of the results')
+    parser.add_argument('-viz', '-vis', action='store_true', help='create a heatmap of the results')
 
     args = parser.parse_args()
     kw = vars(args)
@@ -241,12 +245,22 @@ if __name__ == '__main__':
     # evaluate!
     results = run_eval(kw['file'], **kw)
 
+
     # write output
     for k in results.keys():
         print(results[k])
-        outname = '%s_%s' % (method, k)
+
+        # create output folder if needed
+        folder_name = 'results'
+        outname = os.path.join(folder_name, '%s_%s' % (method, k))
+        if kw['viz'] or kw['output']:
+            make_results_folder(folder_name)
+
+        # output visualization
         if kw['viz']:
             plot_results(outname, results[k], k)
+
+        # create latex table output
         if kw['output']:
             latex_str = results[k].to_latex() \
                                   .replace('°', '\\degree') # usepackage{gensymb}
@@ -261,3 +275,5 @@ if __name__ == '__main__':
                 fi.write(latex_str)
                 fi.write('\\caption{%s}\n' % caption)
                 fi.write('\\end{table}\n')
+    print('done')
+
