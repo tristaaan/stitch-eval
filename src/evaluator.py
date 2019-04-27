@@ -5,7 +5,6 @@ import gc
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 from imageio import imread, imwrite
 from imutils import resize
@@ -13,38 +12,7 @@ from imutils import resize
 from im_split import im_split
 from Fiducials import Fiducial_corners, group_transform, \
                       group_transform_affine, zero_group
-
-
-def saveimfids(fname, im, fids, truthy=[]):
-    '''
-    plot fiducial markers on the stitched image
-    '''
-    fig, a = plt.subplots(1, 1, figsize=(4, 5))
-    colors = ['ro', 'co', 'bo', 'yo']
-    a.imshow(im, cmap='gray')
-    # offset fiducial markers for visualization
-    offset_x, offset_y = (0,0)
-    min_x = min(f.min_x() for f in fids)
-    min_y = min(f.min_y() for f in fids)
-    if min_x < 0:
-        offset_x = -1 * min_x
-    if min_y < 0:
-        offset_y = -1 * min_y
-    # draw them on the plot
-    for i,fid in enumerate(fids):
-        fid.transform(offset_x, offset_y, 0)
-        for c in fid.corners:
-            x,y = c
-            a.plot(x,y, colors[i])
-    for fid in truthy:
-        for c in fid.corners:
-            x,y = c
-            a.plot(x,y, 'w*')
-    plt.savefig(fname)
-    a.cla()
-    fig.clf()
-    plt.close(fig)
-
+from vizualization import saveimfids, plot_results
 
 def build_fiducials(initial, transforms, affine=False):
     '''
@@ -144,8 +112,8 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         rotation = True
         overlap  = True
 
-    # overlap_range = [o/100 for o in range(20, 81, 10)]
-    overlap_range = [0.30]
+    overlap_range = [o/100 for o in range(20, 81, 10)]
+    # overlap_range = [0.60, 0.75]
 
     out = {}
     kw = {'downsample': downsample, 'debug': kwargs['debug']}
@@ -163,7 +131,7 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         out['noise'] = df
 
     if rotation:
-        rot_range = range(-30,31,15)
+        rot_range = range(-45,46,5)
         # rot_range = [0, 15, 0]
 
         table = []
@@ -219,7 +187,7 @@ def fiducial_edge_error(gt, est):
 
 def fiducial_point_error(gt, est):
     '''
-    total registration error
+    total registration error between ground-truth and estimated
     '''
     labels = ['A', 'B', 'C', 'D']
     g = dict(zip(labels, gt))
@@ -262,6 +230,7 @@ if __name__ == '__main__':
     parser.add_argument('-downsample', '-ds', help='downsample images', type=int, default='-1')
     parser.add_argument('-output', '-o', action='store_true', help='output results to LaTeX table')
     parser.add_argument('-debug', action='store_true', help='write the stitched image after each stitch')
+    parser.add_argument('-viz', action='store_true', help='create a heatmap of the results')
 
     args = parser.parse_args()
     kw = vars(args)
@@ -275,12 +244,16 @@ if __name__ == '__main__':
     # write output
     for k in results.keys():
         print(results[k])
+        outname = '%s_%s' % (method, k)
+        if kw['viz']:
+            plot_results(outname, results[k], k)
         if kw['output']:
             latex_str = results[k].to_latex() \
                                   .replace('°', '\\degree') # usepackage{gensymb}
-            with open('%s_%s.tex' % (method, k), 'w') as fi:
-                caption = '%s results for %s method.' % (k[0].upper() + k[1:],
-                                                         method).replace('_', '\\_')
+            results[k].to_csv(outname + '.csv')
+            with open(outname + '.tex', 'w') as fi:
+                caption = ('%s results for %s method.' % (k[0].upper() + k[1:],
+                                                         method)).replace('_', '\\_')
                 if kw['downsample']:
                     ds = kw['downsample']
                     caption += ' Base image downsampled to $%d\\times%d$ pixels.' % (ds, ds)
