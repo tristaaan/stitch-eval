@@ -36,19 +36,20 @@ def saveimfids(fname, im, fids, truthy=[]):
     fig.clf()
     plt.close(fig)
 
-
 def reindex(table, param):
   '''
   change table layout for heatmap
   '''
+  assert table.shape[0] > 1, 'Cannot reindex table with one row'
+
   ranges = table.columns
-  num_ranges = list(map(lambda x: float(re.sub(r'[°(db)]','', x)), ranges))
+  num_ranges = list(map(lambda x: float(re.sub(r'[°(db)%]','', x)), ranges))
   flat = pd.DataFrame(columns=['overlap', param, 'error', 'time'])
   for index, row in table.iterrows():
     for i,v in enumerate(ranges):
       cell = row[i]
-      err, duration = list(map(lambda x: float(re.sub(r'[\(\)s]', '', x)), \
-                               cell.split(', ')))
+      err, duration = list(map(lambda c: float(re.sub(r'[\(\)s]', '', c)), \
+                           cell.split(', ')))
       flat = flat.append({'overlap': index, param: num_ranges[i], \
                          'time': duration, 'error': err}, ignore_index=True)
   return flat
@@ -57,6 +58,10 @@ def plot_results(fname, results, param, needs_reindex=True):
   '''
   visualize results in a seaborn annotated heatmap
   '''
+  if results.shape[0] == 1:
+    plot_1d_results(fname, results, param)
+    return
+
   if needs_reindex:
     results = reindex(results, param)
   reformatted = results.pivot('overlap', param, 'error')
@@ -69,11 +74,24 @@ def plot_results(fname, results, param, needs_reindex=True):
   plt.savefig('%s.png' % fname)
 
 
+def plot_1d_results(fname, results, param):
+  # import pdb
+  # pdb.set_trace()
+  vals    = list(map(lambda x: float(x.split(', ')[0].replace('(','')), \
+                     results.loc[0].values[1:]))
+  x_marks = list(map(lambda x: float(x.replace('%', '')), \
+                     results.columns.values[1:]))
+  print(vals, x_marks)
+  plt.plot(x_marks, vals)
+  plt.savefig('%s.png' % fname)
+
+
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Visualize csv results')
   parser.add_argument('-file', '-f', help='filename', type=str)
   args = parser.parse_args()
   kw = vars(args)
+
   fname = kw['file']
   table = pd.read_csv(fname)
   outfile = path.basename(fname).split('.')[0]
