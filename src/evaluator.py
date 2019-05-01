@@ -10,7 +10,7 @@ import pandas as pd
 from im_split import im_split
 from Fiducials import Fiducial_corners, group_transform, \
                       group_transform_affine, zero_group
-from visualization import saveimfids, plot_results
+from visualization import saveimfids, reindex, plot_results
 
 def build_fiducials(initial, transforms, affine=False):
     '''
@@ -110,8 +110,8 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         rotation = True
         overlap  = True
 
-    overlap_range = [o/100 for o in range(20, 81, 10)]
-    # overlap_range = [0.60, 0.75]
+    # overlap_range = [o/100 for o in range(20, 81, 10)]
+    overlap_range = [0.60, 0.75]
 
     out = {}
     kw = {'downsample': downsample, 'debug': kwargs['debug']}
@@ -130,7 +130,7 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
 
     if rotation:
         rot_range = range(-60,61,10)
-        # rot_range = [0, 15, 0]
+        # rot_range = [-15, 0, 15]
 
         table = []
         for o in overlap_range:
@@ -232,8 +232,9 @@ if __name__ == '__main__':
                         default='../data/T1_Img_002.00.tif')
     parser.add_argument('-method', '-m',     help='method to evaluate', type=str, default='akaze')
     parser.add_argument('-downsample', '-ds', help='downsample images', type=int, default='-1')
-    parser.add_argument('-output', '-o', action='store_true', help='output results to LaTeX table')
+    parser.add_argument('-output', '-o', action='store_true', help='output results to csv')
     parser.add_argument('-debug', action='store_true', help='write the stitched image after each stitch')
+    parser.add_argument('-tex', action='store_true', help='output results to LaTeX table')
     parser.add_argument('-viz', '-vis', action='store_true', help='create a heatmap of the results')
 
     args = parser.parse_args()
@@ -253,7 +254,7 @@ if __name__ == '__main__':
         # create output folder if needed
         folder_name = 'results'
         outname = os.path.join(folder_name, '%s_%s' % (method, k))
-        if kw['viz'] or kw['output']:
+        if kw['viz'] or kw['tex'] or kw['output']:
             make_results_folder(folder_name)
 
         # output visualization
@@ -261,7 +262,7 @@ if __name__ == '__main__':
             plot_results(outname, results[k], k)
 
         # create latex table output
-        if kw['output']:
+        if kw['tex']:
             latex_str = results[k].to_latex() \
                                   .replace('°', '\\degree') # usepackage{gensymb}
             results[k].to_csv(outname + '.csv')
@@ -275,5 +276,10 @@ if __name__ == '__main__':
                 fi.write(latex_str)
                 fi.write('\\caption{%s}\n' % caption)
                 fi.write('\\end{table}\n')
+
+        if kw['output']:
+            df = reindex(results[k], k)
+            df.to_csv(outname + '.csv')
+
     print('done')
 
