@@ -8,8 +8,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 
+from Fiducials import Fiducial_corners
 
-def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, **kwargs):
+def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, \
+             fiducials=False, **kwargs):
     '''
     Takes an image `im` and optionally a parameter `blocks` to determine how many blocks it should
     be split into. `blocks` must be a square number greater than 1. Overlap determines the
@@ -30,24 +32,19 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, *
     output_w = 0
     output_h = 0
 
-        # these ratios are tricky
-    if overlap <= 0.5:
-        base_block = width / rows
-        ratio = 1/((1/overlap) + 1) # increase the denominator 1/2 -> 1/3
-        overlap_p = base_block * ratio
-        output_w = base_block + overlap_p
-        output_h = output_w # assumes image is square
-        stride = base_block - overlap_p
-    else:
-        base_block = width / rows
-        ratio = overlap # decrease the denominator, 3/4 -> 1/3
-        overlap_p = base_block * ratio
-        output_w = base_block + overlap_p
-        output_h = output_w # assumes image is square
-        stride = base_block- overlap_p
+    if blocks > 4:
+        raise NotImplementedError('Number of blocks > 4 not yet supported. \
+                                  (all tiles will not be the same size)')
+
+    # block_side = L / 2-p
+    base_block = width / rows
+    output_w = width  / (2 - overlap)
+    output_h = height / (2 - overlap)
+    stride = output_w - (output_w - base_block)*2 # assumes square
 
     output_images = []
-    # print('b:%d o:%d' % (output_w, offset))
+    ground_truth_corners = [] # ground truth to compare to
+    initial_corners      = [] # initial fiducials to transform
     for r in range(rows):
         r_start = int(stride * r)
         r_end   = int(min(r_start + output_w, height))
@@ -55,9 +52,14 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, *
             c_start = int(stride * c)
             c_end   = int(min(c_start + output_w, width))
             block = im[r_start:r_end,c_start:c_end]
+            base_shape = (r_end-r_start, c_end-c_start)
             # Do not transform the first block.
             if r+c == 0:
                 output_images.append(block)
+                ground_truth_corners.append(Fiducial_corners(base_shape,
+                                        initial_transform=[0, 0, 0]))
+                initial_corners.append(Fiducial_corners(base_shape,
+                                        initial_transform=[0, 0, 0]))
                 continue
             if noise > 0:
                 mean = 0.0
@@ -69,7 +71,14 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, *
                 block = imutils.rotate_bound(block, rotation)
 
             output_images.append(block)
+            ground_truth_corners.append(Fiducial_corners(base_shape,
+                                        initial_transform=[c_start, r_start, 0]))
+            initial_corners.append(Fiducial_corners(base_shape,
+                                        initial_transform=[0,0,rotation],
+                                        unit='d'))
 
+    if fiducials:
+        return output_images, ground_truth_corners, initial_corners
     return output_images
 
 

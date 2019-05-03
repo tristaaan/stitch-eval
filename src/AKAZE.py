@@ -34,7 +34,7 @@ def stitch(im1, im2, matcher):
     if len(better_matches) < 10:
         # cache feature points
         print('could not find enough matches')
-        return None, None
+        return None, None, None
 
     # Warp the second image to best match the first.
     src_pts = np.float32([ kp_2[m.trainIdx].pt for m in better_matches ]).reshape(-1,1,2)
@@ -47,12 +47,13 @@ def stitch(im1, im2, matcher):
     # use the homography offsets to determine the size for the stitched image
     x_offset, y_offset = M[0:2, 2]
     new_size = (int(w+x_offset), int(h+y_offset))
+    affine_M = M[:2,:3]
 
     # warp and paste
-    warped = cv2.warpAffine(im2, M[:2,:3], new_size, flags=cv2.INTER_CUBIC)
+    warped = cv2.warpAffine(im2, affine_M, new_size, flags=cv2.INTER_CUBIC)
     base = eq_paste(im1, warped)
     base = crop_zeros(base)
-    return (base, time() - start)
+    return (base, affine_M, time() - start)
 
 
 def AKAZE(blocks):
@@ -60,13 +61,11 @@ def AKAZE(blocks):
 
     A,B,C,D = blocks
 
-    AB, t1 = stitch(A, B, bf_matcher)
-    CD, t2 = stitch(C, D, bf_matcher)
+    AB, M1, t1 = stitch(A, B, bf_matcher)
+    CD, M2, t2 = stitch(C, D, bf_matcher)
     if t1 == None or t2 == None:
-        return (None, None)
-    E,  t3 = stitch(AB, CD, bf_matcher)
+        return (None, None, None)
+    E, M3, t3 = stitch(AB, CD, bf_matcher)
 
     base = crop_zeros(E)
-    # imwrite('../data/tmp/stitched-%s.tif' % (str(time())), E)
-    imwrite('../data/stitched.tif', base)
-    return (base, sum([t1,t2,t3]))
+    return (base, [M1, M2, M3], sum([t1,t2,t3]))
