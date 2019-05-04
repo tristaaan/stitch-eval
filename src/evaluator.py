@@ -7,6 +7,9 @@ import os
 import numpy as np
 import pandas as pd
 
+from cv2 import imread
+from time import time
+
 from im_split import im_split
 from Fiducials import Fiducial_corners, group_transform, \
                       group_transform_affine, zero_group
@@ -112,7 +115,7 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         overlap  = True
 
     overlap_range = [o/100 for o in range(20, 81, 10)]
-    # overlap_range = [0.60, 0.75]
+    # overlap_range = [0.60, 0.75] # for smaller debug runs
 
     out = {}
     kw = {'downsample': downsample, 'debug': kwargs['debug']}
@@ -131,7 +134,7 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
 
     if rotation:
         rot_range = range(-60,61,10)
-        # rot_range = [-15, 0, 15]
+        # rot_range = [-15, 0, 15] # for smaller debug runs
 
         table = []
         for o in overlap_range:
@@ -200,20 +203,24 @@ if __name__ == '__main__':
     # evaluate!
     results = run_eval(kw['file'], **kw)
 
-
     # write output
     for k in results.keys():
         print(results[k])
 
         # create output folder if needed
         folder_name = 'results'
-        outname = os.path.join(folder_name, '%s_%s' % (method, k))
+        outname = os.path.join(folder_name, '%s_%s_%s' % (method, k, time()))
         if kw['viz'] or kw['tex'] or kw['output']:
             make_results_folder(folder_name)
 
         # output visualization
         if kw['viz']:
-            plot_results(outname, results[k], k)
+            image_size = 0
+            if kw['downsample'] > 0:
+                image_size = kw['downsample']
+            else:
+                image_size = max(imread(kw['file']).shape)
+            plot_results(outname, results[k], k, image_size=image_size)
 
         # create latex table output
         if kw['tex']:

@@ -2,9 +2,12 @@ import argparse
 import re
 from os import path
 
+import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as clr
 import seaborn as sns
 import pandas as pd
+
 
 def saveimfids(fname, im, fids, truthy=[]):
     '''
@@ -36,6 +39,7 @@ def saveimfids(fname, im, fids, truthy=[]):
     fig.clf()
     plt.close(fig)
 
+
 def reindex(table, param):
   '''
   change table layout for heatmap
@@ -54,7 +58,8 @@ def reindex(table, param):
                          'time': duration, 'error': err}, ignore_index=True)
   return flat
 
-def plot_results(fname, results, param, needs_reindex=True):
+
+def plot_results(fname, results, param, image_size=512, needs_reindex=True):
   '''
   visualize results in a seaborn annotated heatmap
   '''
@@ -66,11 +71,25 @@ def plot_results(fname, results, param, needs_reindex=True):
     results = reindex(results, param)
   reformatted = results.pivot('overlap', param, 'error')
 
+  max_e = np.nanmax(results.error)
+  success_start = image_size / 10 / max_e
+  failure_end = success_start + 0.001
+  tick_count = 5
+  tick = int(max_e / tick_count)
+  ticks = [success_start*max_e] + list(range(int(success_start*max_e + tick), \
+                                       int(max_e), tick-1)) + [max_e]
   sns.set()
   f, ax = plt.subplots(figsize=(9, 6))
-  cmap = sns.blend_palette(['green','red'], as_cmap=True)
-  sns.heatmap(reformatted, annot=True, fmt='.02f', cmap=cmap, \
-              linewidths=.5, ax=ax)
+  cmap = clr.LinearSegmentedColormap.from_list('custom blue',
+                                             [(0,    '#7EF249'),
+                                              (success_start, '#3FCD00'),
+                                              (failure_end,   '#FFF2F2'),
+                                              (1,    '#F2494C')], N=256)
+
+  sns.heatmap(reformatted, annot=True, fmt='.02f', cmap=cmap,  \
+              linewidths=.5, ax=ax, annot_kws={'rotation':40}, \
+              vmin=0, vmax=max_e,                 \
+              cbar_kws={'ticks':ticks})
   plt.savefig('%s.png' % fname)
 
 
@@ -89,11 +108,15 @@ def plot_1d_results(fname, results, param):
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Visualize csv results')
   parser.add_argument('-file', '-f', help='filename', type=str)
+  parser.add_argument('-size', '-s', help='image size from the results to help' \
+                                         +'determine the color scale', \
+                                         type=int, default=512)
   args = parser.parse_args()
   kw = vars(args)
 
   fname = kw['file']
   table = pd.read_csv(fname)
   outfile = path.basename(fname).split('.')[0]
-  plot_results(outfile, table, table.columns[2], needs_reindex=False)
 
+  plot_results(outfile, table, table.columns[2], \
+               image_size=kw['size'], needs_reindex=False)
