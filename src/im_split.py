@@ -64,7 +64,9 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, \
             if noise > 0:
                 mean = 0.0
                 std = noise
-                block = skimage.util.random_noise(block, mode='gaussian', mean=mean, var=std)
+                block = skimage.util.random_noise(block, mode='gaussian', \
+                                                  mean=mean, var=std,     \
+                                                  seed=1234)
                 block *= (2**16)-1               # scale pixels back to 0..65535
                 block = block.astype('uint16')   # cast back to uint16
             if rotation != 0:
