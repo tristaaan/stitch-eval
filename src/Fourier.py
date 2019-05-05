@@ -5,7 +5,6 @@ import gc
 import numpy as np
 import scipy as sp
 
-from collections import deque
 from imageio import imread, imwrite
 from imutils import rotate_bound
 from math import pi,sqrt
@@ -75,9 +74,10 @@ def F_stitch(im1, im2):
     start = time()
     zero = 500
 
-    im1 = im1.astype('float64')
-    im2 = im2.astype('float64')
+    im1 = im1.astype('float32')
+    im2 = im2.astype('float32')
 
+    # save originals for rotation later
     im1_orig = im1.copy()
     im2_orig = im2.copy()
 
@@ -88,9 +88,6 @@ def F_stitch(im1, im2):
 
     if im1.shape != im2.shape:
         im1, im2 = bounds_equalize(im1, im2)
-
-    im1 = apply_hamming_window(im1)
-    im2 = apply_hamming_window(im2)
 
     # convert to log-polar coordinates
     im1_p = log_polar(im1)
@@ -128,8 +125,6 @@ def F_stitch(im1, im2):
 
     # find the x,y translation
     im1, im2 = ul_equalize(im1, im2)
-    im1 = apply_hamming_window(im1)
-    im2 = apply_hamming_window(im2)
 
     impulse = ifft2(phase_correlation(im1, im2))
     y,x = np.unravel_index(np.argmax(impulse), impulse.shape)
