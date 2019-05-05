@@ -140,7 +140,7 @@ def F_stitch(im1, im2):
         x -= im1.shape[1]
 
     # t_mod has already been applied for merging
-    print('x:%d+%d, y:%d+%d, theta:%.02f' % (x, tx, y, ty, angle))
+    # print('x:%d+%d, y:%d+%d, theta:%.02f' % (x, tx, y, ty, angle))
     h_offset, w_offset = im1_orig.shape
     base = merge(im1_orig, im2_orig, x, y, zero=zero)
 
