@@ -12,17 +12,24 @@ from time import time
 from util import eq_paste, crop_zeros
 
 
+def uint16_to_uint8(im):
+    im = (im / (2**16-1) * 255).astype('uint8')
+    return im
+
+
 def get_akaze_keypoints(im):
     akaze = cv2.AKAZE_create()
     return akaze.detectAndCompute(im, None)
 
 
 def get_sift_keypoints(im):
+    im = uint16_to_uint8(im)
     sift = cv2.xfeatures2d.SIFT_create()
     return sift.detectAndCompute(im, None)
 
 
-def get_akaze_keypoints(im):
+def get_surf_keypoints(im):
+    im = uint16_to_uint8(im)
     surf = cv2.xfeatures2d.SURF_create()
     return surf.detectAndCompute(im, None)
 
