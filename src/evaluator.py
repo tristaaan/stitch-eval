@@ -103,7 +103,7 @@ def eval_param(image_name, method, param, data_range, overlap=0.2,
 
 
 def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
-             downsample=False, o_range=[20,80,10], **kwargs):
+             downsample=False, o_range=[20,80,10], r_range=[60,61,10], **kwargs):
     '''
     Run a study on a method with a variety of parameters:
     overlap + [noise, rotation]
@@ -133,7 +133,8 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         out['noise'] = df
 
     if rotation:
-        rot_range = range(-60,61,10)
+        r_range[1] += 1
+        rot_range = range(*r_range)
         # rot_range = [-15, 0, 15] # for smaller debug runs
 
         table = []
@@ -170,7 +171,7 @@ def method_picker(name):
     method_names = list(map(lambda x: x.__name__.lower(), methods))
     return methods[method_names.index(name.lower())]
 
-def parse_range(s):
+def arg_range(s):
     arr = list(map(int, s.split(':')))
     assert len(arr) >= 2, 'there must be start and end to the range: %s' % s
 
@@ -194,8 +195,10 @@ if __name__ == '__main__':
     parser.add_argument('-rotation', action='store_true', help='run rotation evaluations')
     parser.add_argument('-overlap',  action='store_true', help='run overlap evaluations')
 
-    parser.add_argument('-o_range', help='range of overlap', type=str, \
-                        default='20:80:10')
+    parser.add_argument('-o_range', help='range of overlap', type=arg_range, \
+                        action='store', default=[20,80,10])
+    parser.add_argument('-r_range', help='range of rotation, for negative values use -r_range="..."',
+                        type=arg_range, action='store', default=[-45,45,15])
 
     # other options
     parser.add_argument('-file', '-f',       help='image filename', type=str,
@@ -218,7 +221,8 @@ if __name__ == '__main__':
     # get method to evaluate
     method = kw['method']
     kw['method'] = method_picker(method)
-    kw['o_range'] = parse_range(kw['o_range'])
+    # kw['o_range'] = parse_range(kw['o_range'])
+    # kw['r_range'] = parse_range(kw['r_range'])
 
     # evaluate!
     results = run_eval(kw['file'], **kw)
