@@ -83,6 +83,8 @@ def stitch_blocks(blocks, method):
     if t1 == None or t2 == None:
         return (None, None, None)
     E, M3, t3 = stitch(AB, CD, bf_matcher, method)
+    if t3 == None:
+        return (None, None, None)
 
     base = crop_zeros(E)
     return (base, [M1, M2, M3], sum([t1,t2,t3]))
