@@ -17,13 +17,23 @@ def get_akaze_keypoints(im):
     return akaze.detectAndCompute(im, None)
 
 
-def stitch(im1, im2, matcher):
+def get_sift_keypoints(im):
+    sift = cv2.xfeatures2d.SIFT_create()
+    return sift.detectAndCompute(im, None)
+
+
+def get_akaze_keypoints(im):
+    surf = cv2.xfeatures2d.SURF_create()
+    return surf.detectAndCompute(im, None)
+
+
+def stitch(im1, im2, matcher, get_keypoints):
     # start timer
     start = time()
 
     # Find feature points
-    (kp_1, desc_1) = get_akaze_keypoints(im1)
-    (kp_2, desc_2) = get_akaze_keypoints(im2)
+    (kp_1, desc_1) = get_keypoints(im1)
+    (kp_2, desc_2) = get_keypoints(im2)
 
     # Match descriptors.
     matches = matcher.knnMatch(desc_1, desc_2, k=2)
@@ -56,16 +66,28 @@ def stitch(im1, im2, matcher):
     return (base, affine_M, time() - start)
 
 
-def AKAZE(blocks):
+def stitch_blocks(blocks, method):
     bf_matcher = cv2.BFMatcher()
 
     A,B,C,D = blocks
 
-    AB, M1, t1 = stitch(A, B, bf_matcher)
-    CD, M2, t2 = stitch(C, D, bf_matcher)
+    AB, M1, t1 = stitch(A, B, bf_matcher, method)
+    CD, M2, t2 = stitch(C, D, bf_matcher, method)
     if t1 == None or t2 == None:
         return (None, None, None)
-    E, M3, t3 = stitch(AB, CD, bf_matcher)
+    E, M3, t3 = stitch(AB, CD, bf_matcher, method)
 
     base = crop_zeros(E)
     return (base, [M1, M2, M3], sum([t1,t2,t3]))
+
+
+def AKAZE(blocks):
+    return stitch_blocks(blocks, get_akaze_keypoints)
+
+
+def SIFT(blocks):
+    return stitch_blocks(blocks, get_sift_keypoints)
+
+
+def SURF(blocks):
+    return stitch_blocks(blocks, get_surf_keypoints)

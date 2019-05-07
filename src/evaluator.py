@@ -103,7 +103,7 @@ def eval_param(image_name, method, param, data_range, overlap=0.2,
 
 
 def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
-             downsample=False, **kwargs):
+             downsample=False, o_range=[20,80,10], **kwargs):
     '''
     Run a study on a method with a variety of parameters:
     overlap + [noise, rotation]
@@ -114,7 +114,7 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         rotation = True
         overlap  = True
 
-    overlap_range = [o/100 for o in range(20, 81, 10)]
+    overlap_range = [o/100 for o in range(o_range[0], o_range[1]+1, o_range[2])]
     # overlap_range = [0.60, 0.75] # for smaller debug runs
 
     out = {}
@@ -157,12 +157,12 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
     return out
 
 def method_picker(name):
-    from AKAZE import AKAZE
+    from Feature import AKAZE, SIFT, SURF
     from amd_alpha import amd_alpha
     from Direct import iterative_ssd, iterative_ncc, iterative_mi
     from Fourier import Frequency
 
-    methods = [AKAZE,
+    methods = [AKAZE, SIFT, SURF,
         amd_alpha,
         Frequency,
         iterative_ssd, iterative_ncc, iterative_mi
@@ -170,6 +170,16 @@ def method_picker(name):
     method_names = list(map(lambda x: x.__name__.lower(), methods))
     return methods[method_names.index(name.lower())]
 
+def parse_range(s):
+    arr = list(map(int, s.split(':')))
+    assert len(arr) >= 2, 'there must be start and end to the range: %s' % s
+
+    start,end = arr[:2]
+    if len(arr) == 3:
+        stride = arr[2]
+    else:
+        stride = 10
+    return [start, end, stride]
 
 def make_results_folder(name):
     try:
@@ -184,21 +194,31 @@ if __name__ == '__main__':
     parser.add_argument('-rotation', action='store_true', help='run rotation evaluations')
     parser.add_argument('-overlap',  action='store_true', help='run overlap evaluations')
 
+    parser.add_argument('-o_range', help='range of overlap', type=str, \
+                        default='20:80:10')
+
     # other options
     parser.add_argument('-file', '-f',       help='image filename', type=str,
                         default='../data/T1_Img_002.00.tif')
-    parser.add_argument('-method', '-m',     help='method to evaluate', type=str, default='akaze')
-    parser.add_argument('-downsample', '-ds', help='downsample images', type=int, default='-1')
-    parser.add_argument('-output', '-o', action='store_true', help='output results to csv')
-    parser.add_argument('-debug', action='store_true', help='write the stitched image after each stitch')
-    parser.add_argument('-tex', action='store_true', help='output results to LaTeX table')
-    parser.add_argument('-viz', '-vis', action='store_true', help='create a heatmap of the results')
+    parser.add_argument('-method', '-m',     help='method to evaluate', \
+                        type=str, default='akaze')
+    parser.add_argument('-downsample', '-ds', help='downsample images', \
+                        type=int, default='-1')
+    parser.add_argument('-output', '-o', action='store_true',   \
+                        help='output results to csv')
+    parser.add_argument('-debug', action='store_true',   \
+                        help='write the stitched image after each stitch')
+    parser.add_argument('-tex', action='store_true',   \
+                        help='output results to LaTeX table')
+    parser.add_argument('-viz', '-vis', action='store_true',   \
+                        help='create a heatmap of the results')
 
     args = parser.parse_args()
     kw = vars(args)
     # get method to evaluate
     method = kw['method']
     kw['method'] = method_picker(method)
+    kw['o_range'] = parse_range(kw['o_range'])
 
     # evaluate!
     results = run_eval(kw['file'], **kw)
