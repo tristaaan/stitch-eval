@@ -3,12 +3,12 @@ import copy
 import gc
 import math
 import os
+import time
 
 import numpy as np
 import pandas as pd
 
 from cv2 import imread
-from time import time
 
 from im_split import im_split
 from Fiducials import Fiducial_corners, group_transform, \
@@ -54,7 +54,7 @@ def build_fiducials(initial, transforms, affine=False):
         group_transform([C,D], x,y,th , unit='d', temp_center=temp_center)
     return [A, B, C, D]
 
-def eval_method(image_name, method, debug=False, **kwargs):
+def eval_method(image_name, method, measurement, debug=False, **kwargs):
     '''
     Evaluate image stitching given an image, a method, and the splitting params
     '''
@@ -67,9 +67,16 @@ def eval_method(image_name, method, debug=False, **kwargs):
     # with the transformations, construct estimated fiducials
     est_fiducials = build_fiducials(initial, transforms, \
                                     affine=hasattr(transforms[0],'shape'))
+
     # compare the estimated ones with the ground_truth ones.
-    acc_result = fiducial_point_error(ground_truth, est_fiducials)
+    if measurement == 'corner':
+        acc_result = fiducial_point_error(ground_truth, est_fiducials)
+    elif measurement == 'edge':
+        acc_result = fiducial_edge_error(ground_truth, est_fiducials)
+    else:
+        raise ValueError('unrecognized measurement')
     suc_result = acc_result < 100
+
     # if debug, write the stitched image.
     if debug:
         print(transforms[0], transforms[1], transforms[2])
@@ -81,7 +88,7 @@ def eval_method(image_name, method, debug=False, **kwargs):
 
 
 def eval_param(image_name, method, param, data_range, overlap=0.2,
-               downsample=False, debug=False):
+               downsample=False, debug=False, measurement='corner'):
     '''
     Run a study on a method given a single range of parameters with overlap
     '''
@@ -96,7 +103,7 @@ def eval_param(image_name, method, param, data_range, overlap=0.2,
         # print(kw)
         if param != 'overlap':
             kw['overlap'] = overlap
-        duration, err, suc = eval_method(image_name, method, **kw)
+        duration, err, suc = eval_method(image_name, method, measurement, **kw)
         print("%s: %0.2f, t: %0.2f, err: %0.2f suc: %0.2f" % (param, val, duration, err, suc))
         row.append('(%.02f, %0.02fs)' % (err, duration))
     return row
@@ -118,7 +125,9 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
     # overlap_range = [0.60, 0.75] # for smaller debug runs
 
     out = {}
-    kw = {'downsample': downsample, 'debug': kwargs['debug']}
+    kw = {'downsample': downsample,
+          'debug': kwargs['debug'],
+          'measurement': kwargs['measurement']}
     if noise:
         noise_range = [d / 1000 for d in range(0,51,10)]
         table = []
@@ -205,6 +214,8 @@ if __name__ == '__main__':
                         default='../data/T1_Img_002.00.tif')
     parser.add_argument('-method', '-m',     help='method to evaluate', \
                         type=str, default='akaze')
+    parser.add_argument('-measurement', '-mm', help='evaluation measurement', \
+                        type=str, default='corner')
     parser.add_argument('-downsample', '-ds', help='downsample images', \
                         type=int, default='-1')
     parser.add_argument('-output', '-o', action='store_true',   \
@@ -233,9 +244,18 @@ if __name__ == '__main__':
 
         # create output folder if needed
         folder_name = 'results'
-        outname = os.path.join(folder_name, '%s_%s_%s' % (method, k, time()))
+        outname = os.path.join(folder_name, '%s_%s_%s_%s' % \
+                               (method, k, \
+                               kw['measurement'], time.strftime('%d-%m_%H:%M')))
         if kw['viz'] or kw['tex'] or kw['output']:
             make_results_folder(folder_name)
+
+        if kw['output']:
+            if results[k].shape[0] > 1:
+                df = reindex(results[k], k)
+                df.to_csv(outname + '.csv')
+            else:
+                results[k].to_csv(outname + '.csv')
 
         # output visualization
         if kw['viz']:
@@ -261,13 +281,6 @@ if __name__ == '__main__':
                 fi.write(latex_str)
                 fi.write('\\caption{%s}\n' % caption)
                 fi.write('\\end{table}\n')
-
-        if kw['output']:
-            if results[k].shape[0] > 1:
-                df = reindex(results[k], k)
-                df.to_csv(outname + '.csv')
-            else:
-                results[k].to_csv(outname + '.csv')
 
     print('done')
 

@@ -73,23 +73,31 @@ def plot_results(fname, results, param, image_size=512, needs_reindex=True):
 
   max_e = np.nanmax(results.error)
   success_start = image_size / 10 / max_e
-  failure_end = success_start + 0.001
+  failure_end = success_start + 0.01
   tick_count = 5
   tick = int(max_e / tick_count)
-  ticks = [success_start*max_e] + list(range(int(success_start*max_e + tick), \
-                                       int(max_e), tick-1)) + [max_e]
+  if success_start > max_e:
+    ticks = [success_start*max_e] + list(range(int(success_start*max_e + tick),\
+                                         int(max_e), tick-1)) + [max_e]
+  else:
+    ticks = [0,max_e]
+
   sns.set()
   f, ax = plt.subplots(figsize=(9, 6))
-  cmap = clr.LinearSegmentedColormap.from_list('custom blue',
-                                             [(0,    '#7EF249'),
-                                              (success_start, '#3FCD00'),
-                                              (failure_end,   '#FFF2F2'),
-                                              (1,    '#F2494C')], N=256)
+  if success_start < 1:
+    spread = [(0,    '#7EF249'),
+              (success_start, '#3FCD00'),
+              (failure_end,   '#FFF2F2'),
+              (1,    '#F2494C')]
+  else:
+    spread = [(0,    '#7EF249'),
+              (1,    '#3FCD00')]
 
+  cmap = clr.LinearSegmentedColormap.from_list('custom blue', spread, N=256)
   sns.heatmap(reformatted, annot=True, fmt='.02f', cmap=cmap,  \
               linewidths=.5, ax=ax, annot_kws={'rotation':40}, \
               vmin=0, vmax=max_e,                 \
-              cbar_kws={'ticks':ticks})
+              cbar_kws={'ticks': ticks})
   plt.savefig('%s.png' % fname)
 
 
