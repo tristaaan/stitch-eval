@@ -73,7 +73,7 @@ def plot_results(fname, results, param, image_size=512, needs_reindex=True):
 
   max_e = np.nanmax(results.error)
   success_start = image_size / 10 / max_e
-  failure_end = success_start + 0.01
+  failure_end = success_start + 0.00001
   tick_count = 5
   tick = int(max_e / tick_count)
   if success_start < max_e:
@@ -93,7 +93,7 @@ def plot_results(fname, results, param, image_size=512, needs_reindex=True):
     spread = [(0,    '#7EF249'),
               (1,    '#3FCD00')]
 
-  cmap = clr.LinearSegmentedColormap.from_list('custom blue', spread, N=256)
+  cmap = clr.LinearSegmentedColormap.from_list('custom blue', spread, N=max_e)
   sns.heatmap(reformatted, annot=True, fmt='.02f', cmap=cmap,  \
               linewidths=.5, ax=ax, annot_kws={'rotation':40}, \
               vmin=0, vmax=max_e,                 \
