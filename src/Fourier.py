@@ -17,7 +17,6 @@ from time import time
 from util import bounds_equalize, ul_equalize, crop_zeros, merge, \
                  square_off, tuple_sub
 
-import tracemalloc
 
 def norm_cross_power_spectrum(i1, i2):
     '''
@@ -74,12 +73,9 @@ def F_stitch(im1, im2):
     start = time()
     zero = 500
 
-    im1 = im1.astype('float32')
-    im2 = im2.astype('float32')
-
     # save originals for rotation later
-    im1_orig = im1.copy()
-    im2_orig = im2.copy()
+    im1_orig = im1.copy().astype('float32')
+    im2_orig = im2.copy().astype('float32')
 
     if not is_square(im1):
         im1 = square_off(im1)
