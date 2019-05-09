@@ -76,7 +76,7 @@ def plot_results(fname, results, param, image_size=512, needs_reindex=True):
   failure_end = success_start + 0.01
   tick_count = 5
   tick = int(max_e / tick_count)
-  if success_start > max_e:
+  if success_start < max_e:
     ticks = [success_start*max_e] + list(range(int(success_start*max_e + tick),\
                                          int(max_e), tick-1)) + [max_e]
   else:
