@@ -28,7 +28,7 @@ class Point(object):
 class Fiducial_corners(object):
     def __init__(self, shape, initial_transform=None, unit='radians'):
         h,w = shape
-        self.center = Point(w//2, h//2)
+        self.center = Point(w/2, h/2)
         self.corners = []
         self.corners.append(Point(0,0)) # tl
         self.corners.append(Point(w,0)) # tr
