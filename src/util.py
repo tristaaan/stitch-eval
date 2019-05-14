@@ -98,7 +98,12 @@ def crop_zeros(im, zero=0, crop_vals=False):
 
 
 def clamp_uint16(val):
-  return min(val, (2**16)-1)
+    return min(val, (2**16)-1)
+
+
+def uint16_to_uint8(im):
+    im = (im / (2**16-1) * 255).astype('uint8')
+    return im
 
 
 def equalize_image(image, target_size):

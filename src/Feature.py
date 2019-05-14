@@ -9,12 +9,7 @@ from imageio import imread, imwrite
 from math import floor
 from time import time
 
-from util import eq_paste, crop_zeros
-
-
-def uint16_to_uint8(im):
-    im = (im / (2**16-1) * 255).astype('uint8')
-    return im
+from util import eq_paste, crop_zeros, uint16_to_uint8
 
 
 def get_akaze_keypoints(im):
