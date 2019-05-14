@@ -169,13 +169,15 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
 def method_picker(name):
     from Feature import AKAZE, SIFT, SURF
     from amd_alpha import amd_alpha
-    from Direct import iterative_ssd, iterative_ncc, iterative_mi
+    # from Direct import iterative_ssd, iterative_ncc, iterative_mi
     from Fourier import Frequency
+    from Learning import Learning, Learning_translational
 
     methods = [AKAZE, SIFT, SURF,
         amd_alpha,
         Frequency,
-        iterative_ssd, iterative_ncc, iterative_mi
+        # iterative_ssd, iterative_ncc, iterative_mi
+        Learning, Learning_translational
     ]
     method_names = list(map(lambda x: x.__name__.lower(), methods))
     return methods[method_names.index(name.lower())]
