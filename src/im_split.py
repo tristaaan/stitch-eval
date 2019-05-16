@@ -68,11 +68,18 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, \
             if noise > 0:
                 mean = 0.0
                 std = noise
+                orig_dtype = block.dtype
+                # adding noise converts image scale from 0..1
                 block = skimage.util.random_noise(block, mode='gaussian', \
                                                   mean=mean, var=std,     \
                                                   seed=1234)
-                block *= (2**16)-1               # scale pixels back to 0..65535
-                block = block.astype('uint16')   # cast back to uint16
+                # scale pixels back to range depending on dtype
+                if orig_dtype == 'uint16':
+                    block *= (2**16)-1
+                elif orig_dtype == 'uint8':
+                    block *= (2**8)-1
+                block = block.astype(orig_dtype)
+
             if rotation != 0:
                 block = imutils.rotate_bound(block, rotation)
 
