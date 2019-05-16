@@ -79,7 +79,7 @@ def eval_method(image_name, method, measurement, debug=False, **kwargs):
 
     # if debug, write the stitched image.
     if debug:
-        print(transforms[0], transforms[1], transforms[2])
+        print(transforms[0], '\n', transforms[1], '\n', transforms[2])
         fname = '../data/tmp/%s_%d_%.02f.tif' % \
                 (method.__name__, int(kwargs['overlap']*100), acc_result)
         saveimfids(fname, stitched, copy.deepcopy(est_fiducials))#, truthy=ground_truth)

@@ -5,7 +5,6 @@ import gc
 import numpy as np
 import scipy as sp
 
-from imageio import imread, imwrite
 from imutils import rotate_bound
 from math import pi,sqrt
 from numpy.fft import fft2, ifft2
