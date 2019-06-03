@@ -59,19 +59,19 @@ def homography_regression_model(input_dims, translation=False):
     return Model(inputs=input_layer, outputs=[out])
 
 
-def hnet():
+def homography_net():
     opt = SGD(lr=0.005, momentum=0.9, decay=0.0)
-    model = homography_regression_model((112,112))
+    model = homography_regression_model((128,128))
     model.compile(optimizer=opt, loss=euclidean_distance)
-    model.load_weights('weights/hnet-weights-32-112.hdf5')
+    model.load_weights('weights/hnet-weights-rigid-train.hdf5')
     return model
 
 
-def translation_hnet():
+def translation_net():
     opt = SGD(lr=0.001, momentum=0.9, decay=0.0)
     model = homography_regression_model((128,128), translation=True)
     model.compile(optimizer=opt, loss=euclidean_distance)
-    model.load_weights('weights/rigid-hnet-weights-32-128-40k.hdf5')
+    model.load_weights('weights/tnet-weights-multiscale.hdf5')
     return model
 
 def invert(im):
@@ -92,8 +92,10 @@ def warp_merge(im1, im2, h):
     This is more reliable than warpAffine because no parts of the image are lost
     '''
     x, y = h[0:2, 2]
-    th1 = math.atan(-h[0,1] / h[0,0]) * 180 / math.pi
-    th2 = math.atan(h[1,0] / h[1,1]) * 180 / math.pi
+    # x = x/128 * im1.shape[1]
+    # y = y/128 * im1.shape[0]
+    th1 = math.atan(-h[0,1] / h[0,0]) * (180 / math.pi) # atan(-b/a)
+    th2 = math.atan(h[1,0] / h[1,1]) * (180 / math.pi)  # atan(c/d)
     th = (th1 + th2) / 2
     warped = rotate_bound(im2, th)
     return merge(im1, warped, x, y), [x,y,th]
@@ -104,17 +106,14 @@ def est_transform(im1, im2, model, img_size):
     this could be more optimized by batching the transformation estimations
     instead of one at a time.
     '''
-    ratio_x = im1.shape[1] / img_size[1]
-    ratio_y = im1.shape[0] / img_size[0]
-
-    im1 = cv2.resize(im1, img_size, interpolation=cv2.INTER_CUBIC)
-    im2 = cv2.resize(im2, img_size, interpolation=cv2.INTER_CUBIC)
-    stack = np.dstack( (invert(im1), invert(im2)) )
+    input_im1 = cv2.resize(im1, img_size, interpolation=cv2.INTER_CUBIC)
+    input_im2 = cv2.resize(im2, img_size, interpolation=cv2.INTER_CUBIC)
+    stack = np.dstack( (invert(input_im1), invert(input_im2)) )
     stack = stack.reshape(1, *stack.shape)
     H = model.predict(stack)[0]
     if len(H) == 8:
-        return H.reshape(4,2) * [ratio_x/2, ratio_y/2]
-    return H * [ratio_x/2, ratio_y/2]
+        return H.reshape(4,2)
+    return H * [im1.shape[1], im1.shape[0]] # scale results
 
 def stitch_blocks(blocks, model, size):
     A,B,C,D = blocks
@@ -160,8 +159,8 @@ def stitch_blocks(blocks, model, size):
     # affine transforms kept as np arrays
     return (final, [t1,t2,t3], time() - start)
 
-def Learning_translation(blocks):
-    return stitch_blocks(blocks, translation_hnet(), (128,128))
+def TN(blocks):
+    return stitch_blocks(blocks, translation_net(), (128,128))
 
-def Learning(blocks):
-    return stitch_blocks(blocks, hnet(), (112,112))
+def DHN(blocks):
+    return stitch_blocks(blocks, homography_net(), (128,128))
