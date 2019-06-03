@@ -58,7 +58,7 @@ def stitch(im1, im2, matcher, get_keypoints):
 
     # use the homography offsets to determine the size for the stitched image
     x_offset, y_offset = M[0:2, 2]
-    new_size = (int(w+x_offset), int(h+y_offset))
+    new_size = (int(w*2+x_offset), int(h*2+y_offset))
     affine_M = M[:2,:3]
 
     # warp and paste
