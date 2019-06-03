@@ -14,7 +14,7 @@ def saveimfids(fname, im, fids, truthy=[]):
     plot fiducial markers on the stitched image
     '''
     fig, a = plt.subplots(1, 1, figsize=(4, 5))
-    colors = ['ro', 'co', 'bo', 'yo']
+    colors = ['r', 'tab:orange', 'c', 'm']
     a.imshow(im, cmap='gray')
     # offset fiducial markers for visualization
     offset_x, offset_y = (0,0)
@@ -26,14 +26,20 @@ def saveimfids(fname, im, fids, truthy=[]):
         offset_y = -1 * min_y
     # draw them on the plot
     for i,fid in enumerate(fids):
-        fid.transform(offset_x, offset_y, 0)
+        # fid.transform(offset_x, offset_y, 0)
         for c in fid.corners:
             x,y = c
-            a.plot(x,y, colors[i])
-    for fid in truthy:
+            x += offset_x
+            y += offset_y
+            a.plot(x,y, 'o', color=colors[i])
+    for i,fid in enumerate(truthy):
         for c in fid.corners:
             x,y = c
-            a.plot(x,y, 'w*')
+            x += offset_x
+            y += offset_y
+            a.plot(x,y, 'o', color=colors[i], mfc='none')
+    a.get_xaxis().set_visible(False)
+    a.get_yaxis().set_visible(False)
     plt.savefig(fname)
     a.cla()
     fig.clf()
