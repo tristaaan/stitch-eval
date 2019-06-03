@@ -171,14 +171,19 @@ def method_picker(name):
     from amd_alpha import amd_alpha
     # from Direct import iterative_ssd, iterative_ncc, iterative_mi
     from Fourier import Frequency
-    from Learning import Learning, Learning_translation
 
     methods = [AKAZE, SIFT, SURF,
         amd_alpha,
         Frequency,
         # iterative_ssd, iterative_ncc, iterative_mi
-        Learning, Learning_translation
     ]
+
+    # Do not import learning methods unless necessary, no need to instantiate
+    # Tensorflow and Keras unless we need to.
+    if name == 'TN' or name == 'DHN':
+        from Learning import DHN, TN
+        methods += [DHN, TN]
+
     method_names = list(map(lambda x: x.__name__.lower(), methods))
     return methods[method_names.index(name.lower())]
 
