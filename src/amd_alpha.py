@@ -36,9 +36,6 @@ def stitch(ref_im, flo_im):
     start = time()
     ref_im_orig = ref_im.copy()
     flo_im_orig = flo_im.copy()
-
-    ref_im = uint16_to_uint8(ref_im)
-    flo_im = uint16_to_uint8(flo_im)
     flo_mask = flo_im != 0 # mask 0 valued areas
 
     # normalize
