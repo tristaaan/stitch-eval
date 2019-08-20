@@ -211,9 +211,9 @@ if __name__ == '__main__':
     parser.add_argument('-rotation', action='store_true', help='run rotation evaluations')
     parser.add_argument('-overlap',  action='store_true', help='run overlap evaluations')
 
-    parser.add_argument('-o_range', help='range of overlap', type=arg_range, \
+    parser.add_argument('-o_range', help='range of overlap start:end:stride', type=arg_range, \
                         action='store', default=[20,80,10])
-    parser.add_argument('-r_range', help='range of rotation, for negative values use -r_range="..."',
+    parser.add_argument('-r_range', help='range of rotation, start:end:stride, for negative values use -r_range="..."',
                         type=arg_range, action='store', default=[-45,45,15])
 
     # other options
