@@ -1,6 +1,5 @@
 import argparse
 import math    # sqrt
-import imageio # imread, imwrite
 import imutils # rotate, resize
 import skimage # noise
 
@@ -8,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 
+from scipy.misc import imread, imsave
 from Fiducials import Fiducial_corners
 
 def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, \
@@ -22,7 +22,7 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, \
     assert math.sqrt(blocks).is_integer(), '√blocks must be a whole integer'
     assert overlap >= 0 and overlap <= 1, 'overlap must be in the range 0...1 inclusive'
 
-    im = imageio.imread('%s' % fname)
+    im = imread('%s' % fname, 'L')
     if downsample > 0:
         im = imutils.resize(im, width=downsample)
     rows = int(math.sqrt(blocks))
@@ -137,7 +137,7 @@ def write_ims(ims, prefix, rotation=False, noise=False, **kwargs):
     if noise:
         flags += '_noise'
     for (ind, im) in enumerate(ims):
-        imageio.imwrite('../data/%s_segment%s_%d.tif' % (prefix, flags, ind+1), im[:, :])
+        imsave('../data/%s_segment%s_%d.tif' % (prefix, flags, ind+1), im[:, :])
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Split an image into blocks' \
