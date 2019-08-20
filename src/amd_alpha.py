@@ -8,7 +8,7 @@ from time import time
 from imageio import imwrite
 from imutils import rotate_bound
 
-from util import crop_zeros, merge, tuple_sub
+from util import crop_zeros, merge, tuple_sub, uint16_to_uint8
 
 sys.path.insert(0, 'py_alpha_amd_release/')
 import py_alpha_amd_release.filters as filters
@@ -37,18 +37,22 @@ def stitch(ref_im, flo_im):
     ref_im_orig = ref_im.copy()
     flo_im_orig = flo_im.copy()
 
+    ref_im = uint16_to_uint8(ref_im)
+    flo_im = uint16_to_uint8(flo_im)
+    flo_mask = flo_im != 0 # mask 0 valued areas
+
     # normalize
     ref_im = filters.normalize(ref_im, 0.0, None)
-    flo_im = filters.normalize(flo_im, 0.0, None)
+    flo_im = filters.normalize(flo_im, 0.0, flo_mask)
 
     diag = 0.5 * (transforms.image_diagonal(ref_im, spacing) +
                   transforms.image_diagonal(flo_im, spacing))
 
+    # weights and masks
     weights1 = np.ones(ref_im.shape)
-    mask1 = np.ones(ref_im.shape, 'bool')
+    ref_mask = np.ones(ref_im.shape, 'bool')
     weights2 = np.ones(flo_im.shape)
-    # mask2 = np.ones(flo_im.shape, 'bool')
-    mask2 = flo_im != 0 # mask the 0 valued areas
+    # flo_mask = flo_mask
 
     reg = amd_alpha_register(2)
 
@@ -56,11 +60,11 @@ def stitch(ref_im, flo_im):
     reg.set_alpha_levels(alpha_levels)
 
     reg.set_reference_image(ref_im)
-    reg.set_reference_mask(mask1)
+    reg.set_reference_mask(ref_mask)
     reg.set_reference_weights(weights1)
 
     reg.set_floating_image(flo_im)
-    reg.set_floating_mask(mask2)
+    reg.set_floating_mask(flo_mask)
     reg.set_floating_weights(weights2)
 
     # Setup the Gaussian pyramid resolution levels
@@ -94,22 +98,24 @@ def stitch(ref_im, flo_im):
     reg.run()
 
     # transform in the format theta, y, x
-    (transform, value) = reg.get_output(0)
+    (transform, _) = reg.get_output(0)
     theta,y,x = transform.get_params()
-    angle = (theta * pi) / 180
+    angle = theta * 180 / pi # convert to degrees
     # print(angle, y,x)
+    (tx, ty) = (0,0)
     pre_size = flo_im_orig.shape
     flo_im_orig = rotate_bound(flo_im_orig, angle)
     post_size = flo_im_orig.shape
-    flo_im_orig, (ty,_,tx,_) = crop_zeros(flo_im_orig, zero=100, crop_vals=True)
-    rot_diff = tuple_sub(post_size,pre_size)
+    flo_im_orig, (cy,_,cx,_) = crop_zeros(flo_im_orig, crop_vals=True)
+    rot_diff = tuple_sub(post_size, pre_size)
+    tx -= cx - rot_diff[1] // 2
+    ty -= cy - rot_diff[1] // 2
 
-    base = merge(ref_im_orig, flo_im_orig, -x,-y)
-    x -= tx - rot_diff[1] // 2
-    y -= ty - rot_diff[0] // 2
-    return (base, [-x,-y,angle], time() - start)
+    base = merge(ref_im_orig, flo_im_orig, -x, -y)
+    return (base, [-x+tx,-y+ty,angle], time() - start)
 
 def amd_alpha(blocks):
+    np.random.seed(1234)
     A,B,C,D = blocks
 
     AB, M1, t1 = stitch(A, B)
