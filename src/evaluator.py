@@ -75,7 +75,6 @@ def eval_method(image_name, method, measurement, debug=False, **kwargs):
         acc_result = fiducial_edge_error(ground_truth, est_fiducials)
     else:
         raise ValueError('unrecognized measurement')
-    suc_result = acc_result < 100
 
     # if debug, write the stitched image.
     if debug:
@@ -84,7 +83,7 @@ def eval_method(image_name, method, measurement, debug=False, **kwargs):
                 (method.__name__, int(kwargs['overlap']*100), acc_result)
         saveimfids(fname, stitched, copy.deepcopy(est_fiducials), truthy=ground_truth)
         gc.collect() # cleans up matplot lib junk
-    return (duration, acc_result, suc_result)
+    return (duration, acc_result)
 
 
 def eval_param(image_name, method, param, data_range, overlap=0.2,
@@ -103,8 +102,8 @@ def eval_param(image_name, method, param, data_range, overlap=0.2,
         # print(kw)
         if param != 'overlap':
             kw['overlap'] = overlap
-        duration, err, suc = eval_method(image_name, method, measurement, **kw)
-        print("%s: %0.2f, t: %0.2f, err: %0.2f suc: %0.2f" % (param, val, duration, err, suc))
+        duration, err = eval_method(image_name, method, measurement, **kw)
+        print("%s: %0.2f, t: %0.2f, err: %0.2f" % (param, val, duration, err))
         row.append('(%.02f, %0.02fs)' % (err, duration))
     return row
 
