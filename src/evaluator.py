@@ -1,6 +1,7 @@
 import argparse
 import copy
 import gc
+import glob
 import math
 import os
 import time
@@ -9,11 +10,12 @@ import numpy as np
 import pandas as pd
 
 from cv2 import imread
+from os import path
 
 from im_split import im_split
 from Fiducials import Fiducial_corners, group_transform, \
                       group_transform_affine, zero_group
-from measurements import fiducial_edge_error, fiducial_point_error
+from measurements import fiducial_point_error
 from visualization import saveimfids, reindex, plot_results
 
 def build_fiducials(initial, transforms, affine=False):
@@ -54,7 +56,7 @@ def build_fiducials(initial, transforms, affine=False):
         group_transform([C,D], x,y,th , unit='d', temp_center=temp_center)
     return [A, B, C, D]
 
-def eval_method(image_name, method, measurement, debug=False, **kwargs):
+def eval_method(image_name, method, debug=False, **kwargs):
     '''
     Evaluate image stitching given an image, a method, and the splitting params
     '''
@@ -63,18 +65,13 @@ def eval_method(image_name, method, measurement, debug=False, **kwargs):
 
     # there was a catastrophic failure
     if duration == None:
-        return (0, np.NAN, False)
+        return (0, np.NAN)
     # with the transformations, construct estimated fiducials
     est_fiducials = build_fiducials(initial, transforms, \
                                     affine=hasattr(transforms[0],'shape'))
 
     # compare the estimated ones with the ground_truth ones.
-    if measurement == 'corner':
-        acc_result = fiducial_point_error(ground_truth, est_fiducials)
-    elif measurement == 'edge':
-        acc_result = fiducial_edge_error(ground_truth, est_fiducials)
-    else:
-        raise ValueError('unrecognized measurement')
+    acc_result = fiducial_point_error(ground_truth, est_fiducials)
 
     # if debug, write the stitched image.
     if debug:
@@ -83,11 +80,12 @@ def eval_method(image_name, method, measurement, debug=False, **kwargs):
                 (method.__name__, int(kwargs['overlap']*100), acc_result)
         saveimfids(fname, stitched, copy.deepcopy(est_fiducials), truthy=ground_truth)
         gc.collect() # cleans up matplot lib junk
+
     return (duration, acc_result)
 
 
-def eval_param(image_name, method, param, data_range, overlap=0.2,
-               downsample=False, debug=False, measurement='corner'):
+def eval_param(inputs, method, param, data_range, overlap=0.2,
+               downsample=False, debug=False):
     '''
     Run a study on a method given a single range of parameters with overlap
     '''
@@ -97,23 +95,47 @@ def eval_param(image_name, method, param, data_range, overlap=0.2,
     else:
         print('%s: %s, overlap: %0.2f' % (method.__name__, param, data_range[0]))
 
+    multi_file = type(inputs) == list
+    if multi_file:
+        duration_sum = 0
+        err_sum = 0
+    else:
+        image_name = inputs
+
     for val in data_range:
         kw = { param: val, 'downsample': downsample, 'debug': debug }
         # print(kw)
         if param != 'overlap':
             kw['overlap'] = overlap
-        duration, err = eval_method(image_name, method, measurement, **kw)
-        print("%s: %0.2f, t: %0.2f, err: %0.2f" % (param, val, duration, err))
-        row.append('(%.02f, %0.02fs)' % (err, duration))
+        if multi_file:
+            for f in inputs:
+                duration, err = eval_method(f, method, **kw)
+                duration_sum += duration
+                err_sum += err
+            row.append('(%.02f, %0.02fs)' %
+                (err/len(inputs),
+                duration/len(inputs)))
+            print("%s: %0.2f, t: %0.2f, err: %0.2f" %
+                (param, val, duration/len(inputs), err/len(inputs)))
+        else:
+            duration, err = eval_method(image_name, method, **kw)
+            print("%s: %0.2f, t: %0.2f, err: %0.2f" % (param, val, duration, err))
+            row.append('(%.02f, %0.02fs)' % (err, duration))
     return row
 
-
-def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
+def run_eval(inputs, method, noise=False, rotation=False, overlap=False,
              downsample=False, o_range=[20,80,10], r_range=[60,61,10], **kwargs):
     '''
-    Run a study on a method with a variety of parameters:
+    Run a study on a method with a variety of parameters on a single image:
     overlap + [noise, rotation]
+    returns a single dataframe with statistics.
     '''
+    multi_file = path.isdir(inputs)
+    if path.isdir(inputs):
+        files = get_images_from_directory(inputs)
+    else:
+        image_name = inputs
+
     # if no arguments are provided all are run.
     if not noise and not rotation and not overlap:
         noise    = True
@@ -125,14 +147,19 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
 
     out = {}
     kw = {'downsample': downsample,
-          'debug': kwargs['debug'],
-          'measurement': kwargs['measurement']}
+          'debug': kwargs['debug']}
     if noise:
         noise_range = [d / 1000 for d in range(0,51,10)]
         table = []
         for o in overlap_range:
             kw['overlap'] = o
-            table.append(eval_param(image_name, method, 'noise', noise_range, **kw))
+            if multi_file:
+                table.append(
+                    eval_param(files, method, 'noise', noise_range, **kw))
+            else:
+                table.append(
+                    eval_param(image_name, method, 'noise', noise_range, **kw))
+
 
         df = pd.DataFrame(table, columns=noise_range, index=overlap_range)
         df.index.names = ['overlap']
@@ -148,8 +175,13 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         table = []
         for o in overlap_range:
             kw['overlap'] = o
-            row = eval_param(image_name, method, 'rotation', rot_range, **kw)
-            table.append(row)
+            if multi_file:
+                table.append(
+                    eval_param(files, method, 'rotation', rot_range, **kw))
+            else:
+                table.append(
+                    eval_param(image_name, method, 'rotation', rot_range, **kw))
+
         df = pd.DataFrame(table, columns=rot_range, index=overlap_range)
         df.index.names = ['overlap']
         df.columns.names = ['rotation']
@@ -157,13 +189,24 @@ def run_eval(image_name, method, noise=False, rotation=False, overlap=False, \
         out['rotation'] = df
 
     if overlap:
-        table = eval_param(image_name, method, 'overlap', overlap_range, **kw)
+        if multi_file:
+            table = eval_param(files, method, 'overlap', overlap_range, **kw)
+        else:
+            table = eval_param(image_name, method, 'overlap', overlap_range, **kw)
+
         df = pd.DataFrame(table).transpose()
         df.index.names = ['overlap']
         df.columns = map(lambda x: '%.0f%%' % (x*100), overlap_range)
         out['overlap'] = df
 
     return out
+
+def get_images_from_directory(directory):
+    types = ('*.tif*', '*.png', '*.jpeg', '*.jpg') # cover most common file types
+    files = []
+    for t in types:
+        files.extend(glob.glob(path.join(directory, t)))
+    return files
 
 def method_picker(name):
     from Feature import AKAZE, SIFT, SURF
@@ -218,10 +261,9 @@ if __name__ == '__main__':
     # other options
     parser.add_argument('-file', '-f',       help='image filename', type=str,
                         default='../data/T1_Img_002.00.tif')
+    parser.add_argument('-dir', '-d',        help='run evaluations on all images in a directory')
     parser.add_argument('-method', '-m',     help='method to evaluate', \
                         type=str, default='akaze')
-    parser.add_argument('-measurement', '-mm', help='evaluation measurement', \
-                        type=str, default='corner')
     parser.add_argument('-downsample', '-ds', help='downsample images', \
                         type=int, default='-1')
     parser.add_argument('-output', '-o', action='store_true',   \
@@ -238,11 +280,12 @@ if __name__ == '__main__':
     # get method to evaluate
     method = kw['method']
     kw['method'] = method_picker(method)
-    # kw['o_range'] = parse_range(kw['o_range'])
-    # kw['r_range'] = parse_range(kw['r_range'])
 
     # evaluate!
-    results = run_eval(kw['file'], **kw)
+    if kw['dir']:
+        results = run_eval(kw['dir'], **kw)
+    else:
+        results = run_eval(kw['file'], **kw)
 
     # write output
     for k in results.keys():
@@ -250,9 +293,8 @@ if __name__ == '__main__':
 
         # create output folder if needed
         folder_name = 'results'
-        outname = os.path.join(folder_name, '%s_%s_%s_%s' % \
-                               (method, k, \
-                               kw['measurement'], time.strftime('%d-%m_%H:%M')))
+        outname = os.path.join(folder_name, '%s_%s_%s' % \
+                               (method, k, time.strftime('%d-%m_%H:%M')))
         if kw['viz'] or kw['tex'] or kw['output']:
             make_results_folder(folder_name)
 
@@ -265,9 +307,11 @@ if __name__ == '__main__':
 
         # output visualization
         if kw['viz']:
-            image_size = 0
             if kw['downsample'] > 0:
                 image_size = kw['downsample']
+            elif kw['dir']:
+                files = get_images_from_directory(kw['dir'])
+                image_size = max(imread(files[0]).shape)
             else:
                 image_size = max(imread(kw['file']).shape)
             plot_results(outname, results[k], k, image_size=image_size)
