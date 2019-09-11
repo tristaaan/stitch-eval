@@ -45,7 +45,7 @@ def stitch(im1, im2, matcher, get_keypoints):
     # make sure we have enough matches.
     if len(better_matches) < 10:
         # cache feature points
-        print('could not find enough matches')
+        # print('could not find enough matches')
         return None, None, None
 
     # Warp the second image to best match the first.
