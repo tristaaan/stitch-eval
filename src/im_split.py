@@ -88,7 +88,7 @@ def im_split(fname, overlap=0.2, rotation=0, noise=0, downsample=-1, \
         return output_images, ground_truth_corners, initial_corners
     return output_images
 
-def im_split_blocks(fname, blocks=4):
+def im_split_blocks(fname, blocks=4, downsample=-1):
     '''
     Takes an image `im` and a parameter `blocks` to determine how many blocks
     it should    be split into. `blocks` must be a square number greater than 1.
@@ -99,6 +99,8 @@ def im_split_blocks(fname, blocks=4):
     assert math.sqrt(blocks).is_integer(), '√blocks must be a whole integer'
 
     im = imageio.imread('%s' % fname)
+    if downsample > 0:
+        im = imutils.resize(im, width=downsample)
     rows = int(math.sqrt(blocks))
     height, width = im.shape[:2]
 
@@ -180,7 +182,7 @@ if __name__ == '__main__':
     kw = vars(args)
     fname = kw['file']
     if kw['blocks'] :
-        imgs = im_split_blocks(fname, kw['blocks'])
+        imgs = im_split_blocks(fname, blocks=kw['blocks'], downsample=kw['downsample'])
     else:
         imgs = im_split(fname, **kw)
     write_ims(imgs, fname.split('_')[0], **kw)
