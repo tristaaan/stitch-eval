@@ -38,9 +38,14 @@ def stitch(im1, im2, matcher, get_keypoints):
     (kp_2, desc_2) = get_keypoints(im2)
 
     # Match descriptors.
-    matches = matcher.knnMatch(desc_1, desc_2, k=2)
-    matches = sorted(matches, key = lambda x:x[0].distance)
-    better_matches = [ m[0] for m in matches if m[0].distance < 0.75 * m[1].distance]
+    if desc_1 is not None and desc_2 is not None:
+        matches = matcher.knnMatch(desc_1, desc_2, k=2)
+        matches = sorted(matches, key = lambda x:x[0].distance)
+        if len(matches) < 10 or not all(map(lambda x: len(x) > 1, matches)):
+            return None, None, None
+        better_matches = [m[0] for m in matches if m[0].distance < 0.75 * m[1].distance]
+    else:
+        return None, None, None
 
     # make sure we have enough matches.
     if len(better_matches) < 10:
@@ -49,11 +54,13 @@ def stitch(im1, im2, matcher, get_keypoints):
         return None, None, None
 
     # Warp the second image to best match the first.
-    src_pts = np.float32([ kp_2[m.trainIdx].pt for m in better_matches ]).reshape(-1,1,2)
-    dst_pts = np.float32([ kp_1[m.queryIdx].pt for m in better_matches ]).reshape(-1,1,2)
+    src_pts = np.float32([kp_2[m.trainIdx].pt for m in better_matches ]).reshape(-1,1,2)
+    dst_pts = np.float32([kp_1[m.queryIdx].pt for m in better_matches ]).reshape(-1,1,2)
 
     # find the transformation given the amount of points
     M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+    if M is None:
+        return None, None, None
     h,w = im2.shape
 
     # use the homography offsets to determine the size for the stitched image
