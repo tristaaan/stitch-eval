@@ -97,8 +97,7 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
 
     multi_file = type(inputs) == list
     if multi_file:
-        duration_sum = 0
-        err_sum = 0
+        fail_thresh = 0.9
     else:
         image_name = inputs
 
@@ -108,15 +107,28 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
         if param != 'overlap':
             kw['overlap'] = overlap
         if multi_file:
+            nan_count = 0
+            duration_sum = 0
+            err_sum = 0
             for f in inputs:
                 duration, err = eval_method(f, method, **kw)
-                duration_sum += duration
-                err_sum += err
-            row.append('(%.02f, %0.02fs)' %
-                (err/len(inputs),
-                duration/len(inputs)))
-            print("%s: %0.2f, t: %0.2f, err: %0.2f" %
-                (param, val, duration/len(inputs), err/len(inputs)))
+                if duration == 0 or err == np.NAN:
+                    nan_count += 1
+                else:
+                    duration_sum += duration
+                    err_sum += err
+            if nan_count >= fail_thresh * len(inputs):
+                row.append('(%.02f, %0.02fs)' % (np.NAN, 0))
+                print("%s: %0.2f, t: %0.2f, err: %0.2f, nan_count: %d/%d" %
+                    (param, val, 0, np.NAN, nan_count, len(inputs)))
+            else:
+                row.append('(%.02f, %0.02fs)' %
+                    (err_sum / (len(inputs) - nan_count),
+                     duration_sum / (len(inputs) - nan_count)))
+                print("%s: %0.2f, t: %0.2f, err: %0.2f" %
+                    (param, val,
+                        duration_sum  / (len(inputs) - nan_count),
+                        err_sum / (len(inputs) - nan_count)))
         else:
             duration, err = eval_method(image_name, method, **kw)
             print("%s: %0.2f, t: %0.2f, err: %0.2f" % (param, val, duration, err))
