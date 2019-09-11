@@ -1,5 +1,6 @@
 import argparse
 import math    # sqrt
+import imageio # imread, imwrite
 import imutils # rotate, resize
 import skimage # noise
 
@@ -7,34 +8,27 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 
-from scipy.misc import imread, imsave
 from Fiducials import Fiducial_corners
+from util import uint16_to_uint8
 
-def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, \
+def im_split(fname, overlap=0.2, rotation=0, noise=0, downsample=-1, \
              fiducials=False, **kwargs):
     '''
-    Takes an image `im` and optionally a parameter `blocks` to determine how many blocks it should
-    be split into. `blocks` must be a square number greater than 1. Overlap determines the
-    percentage overlap between the blocks, for example, if `p=0.2` 20% of an image will
-    be common with its neighboring image.
+    Takes an image `im` and splits it into four blocks given some overlap
+    percentage. Optionally rotation and noise can also be applied
+    a downsample argument can be passed to downsample the original image.
     '''
-    assert blocks > 1, 'blocks must be greater than one'
-    assert math.sqrt(blocks).is_integer(), '√blocks must be a whole integer'
     assert overlap >= 0 and overlap <= 1, 'overlap must be in the range 0...1 inclusive'
 
-    im = imread('%s' % fname, 'L')
+    im = imageio.imread('%s' % fname)
     if downsample > 0:
         im = imutils.resize(im, width=downsample)
-    rows = int(math.sqrt(blocks))
+    rows = 2
     height, width = im.shape[:2]
 
     stride = None
     output_w = 0
     output_h = 0
-
-    if blocks > 4:
-        raise NotImplementedError('Number of blocks > 4 not yet supported. \
-                                  (all tiles will not be the same size)')
 
     # block_side = L / 2-p
     base_block_w = width / rows
@@ -94,6 +88,38 @@ def im_split(fname, overlap=0.2, blocks=4, rotation=0, noise=0, downsample=-1, \
         return output_images, ground_truth_corners, initial_corners
     return output_images
 
+def im_split_blocks(fname, blocks=4):
+    '''
+    Takes an image `im` and a parameter `blocks` to determine how many blocks
+    it should    be split into. `blocks` must be a square number greater than 1.
+    There is no overlap for images
+    generated from this method. It is just for splitting up images.
+    '''
+    assert blocks > 1, 'blocks must be greater than one'
+    assert math.sqrt(blocks).is_integer(), '√blocks must be a whole integer'
+
+    im = imageio.imread('%s' % fname)
+    rows = int(math.sqrt(blocks))
+    height, width = im.shape[:2]
+
+    output_w = im.shape[1] / rows
+    output_h = im.shape[0] / rows
+
+    output_images = []
+    for r in range(rows):
+        r_start = int(output_h * r)
+        r_end   = int(min(r_start + output_h, height))
+        for c in range(rows):
+            c_start = int(output_w * c)
+            c_end   = int(min(c_start + output_w, width))
+            block = im[r_start:r_end,c_start:c_end]
+            base_shape = (r_end-r_start, c_end-c_start)
+
+            block = im[r_start:r_end,c_start:c_end]
+            output_images.append(block)
+
+    return output_images
+
 
 def plot_blocks(imgs, bars=False):
     fig = plt.figure(figsize=(9, 8), dpi=72)
@@ -137,7 +163,8 @@ def write_ims(ims, prefix, rotation=False, noise=False, **kwargs):
     if noise:
         flags += '_noise'
     for (ind, im) in enumerate(ims):
-        imsave('../data/%s_segment%s_%d.tif' % (prefix, flags, ind+1), im[:, :])
+        imageio.imwrite('../data/%s_segment%s_%d.tif' % (prefix, flags, ind+1), im[:, :])
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Split an image into blocks' \
@@ -146,11 +173,14 @@ if __name__ == '__main__':
     parser.add_argument('-noise', '-n', help='add noise', type=float, default=0)
     parser.add_argument('-rotation', '-r', help='add rotation', type=int, default=0)
     parser.add_argument('-overlap', '-o', help='overlap percentage [0...1]', type=float, default=0.2)
-    parser.add_argument('-blocks', '-b', help='number of blocks, must be a square number', type=int, default=4)
+    parser.add_argument('-blocks', '-b', help='number of blocks, must be a square number', type=int)
     parser.add_argument('-downsample', '-ds', help='downsample output images', type=int, default=-1)
     parser.add_argument('-file', '-f', help='image filename', type=str, default='../data/T1_Img_002.00.tif')
     args = parser.parse_args()
     kw = vars(args)
     fname = kw['file']
-    imgs = im_split(fname, **kw)
+    if kw['blocks'] :
+        imgs = im_split_blocks(fname, kw['blocks'])
+    else:
+        imgs = im_split(fname, **kw)
     write_ims(imgs, fname.split('_')[0], **kw)
