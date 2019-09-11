@@ -103,7 +103,6 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
 
     for val in data_range:
         kw = { param: val, 'downsample': downsample, 'debug': debug }
-        # print(kw)
         if param != 'overlap':
             kw['overlap'] = overlap
         if multi_file:
@@ -122,13 +121,11 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
                 print("%s: %0.2f, t: %0.2f, err: %0.2f, nan_count: %d/%d" %
                     (param, val, 0, np.NAN, nan_count, len(inputs)))
             else:
-                row.append('(%.02f, %0.02fs)' %
-                    (err_sum / (len(inputs) - nan_count),
-                     duration_sum / (len(inputs) - nan_count)))
+                err      = err_sum / (len(inputs) - nan_count)
+                duration = duration_sum / (len(inputs) - nan_count)
+                row.append('(%.02f, %0.02fs)' %  (err, duration))
                 print("%s: %0.2f, t: %0.2f, err: %0.2f" %
-                    (param, val,
-                        duration_sum  / (len(inputs) - nan_count),
-                        err_sum / (len(inputs) - nan_count)))
+                    (param, val, duration, err))
         else:
             duration, err = eval_method(image_name, method, **kw)
             print("%s: %0.2f, t: %0.2f, err: %0.2f" % (param, val, duration, err))
