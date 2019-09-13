@@ -43,7 +43,7 @@ def stitch(im1, im2, matcher, get_keypoints):
         matches = sorted(matches, key = lambda x:x[0].distance)
         if len(matches) < 10 or not all(map(lambda x: len(x) > 1, matches)):
             return None, None, None
-        better_matches = [m[0] for m in matches if m[0].distance < 0.75 * m[1].distance]
+        better_matches = [m[0] for m in matches if m[0].distance < 0.8 * m[1].distance]
     else:
         return None, None, None
 
