@@ -21,7 +21,8 @@ def norm_cross_power_spectrum(i1, i2):
     '''
     normalized cross power spectrum, Faroosh et. al.
     '''
-    assert i1.shape[0] == i2.shape[0] and i1.shape[1] == i2.shape[1], 'images are different sizes: %s v %s' % (i1.shape, i2.shape,)
+    assert i1.shape[0] == i2.shape[0] and i1.shape[1] == i2.shape[1], \
+        'images are different sizes: %s v %s' % (i1.shape, i2.shape,)
     f1 = fft2(i1)
     f2 = fft2(i2)
     return (f1 * conj(f2)) / abs(f2 * conj(f2))
@@ -32,7 +33,8 @@ def cross_power_spectrum(i1, i2):
     Cross power spectrum,
     Image Mosaic Based on Phase Correlation and Harris Operator, F. Yang et al.
     '''
-    assert i1.shape[0] == i2.shape[0] and i1.shape[1] == i2.shape[1], 'images are different sizes: %s v %s' % (i1.shape, i2.shape,)
+    assert i1.shape[0] == i2.shape[0] and i1.shape[1] == i2.shape[1], \
+        'images are different sizes: %s v %s' % (i1.shape, i2.shape,)
     f1 = fft2(i1)
     f2 = fft2(i2)
     return (f1 * conj(f2)) / abs(f1 * conj(f2))
@@ -44,7 +46,8 @@ def phase_correlation(i1, i2):
     "here the spectrum of the two signals is whitened by dividing each
     per frequency product by the magnitudes of the Fourier transforms"
     '''
-    assert i1.shape[0] == i2.shape[0] and i1.shape[1] == i2.shape[1], 'images are different sizes: %s v %s' % (i1.shape, i2.shape,)
+    assert i1.shape[0] == i2.shape[0] and i1.shape[1] == i2.shape[1], \
+        'images are different sizes: %s v %s' % (i1.shape, i2.shape,)
     f1 = fft2(i1)
     f2 = fft2(i2)
     return (f1 * conj(f2)) / (abs(f1) * abs(f2))
@@ -73,8 +76,8 @@ def F_stitch(im1, im2):
     zero = 500
 
     # save originals for rotation later
-    im1_orig = im1.copy().astype('float32')
-    im2_orig = im2.copy().astype('float32')
+    im1_orig = im1.copy()
+    im2_orig = im2.copy()
 
     if not is_square(im1):
         im1 = square_off(im1)
