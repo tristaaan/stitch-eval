@@ -16,7 +16,7 @@ from im_split import im_split
 from Fiducials import Fiducial_corners, group_transform, \
                       group_transform_affine, zero_group
 from measurements import fiducial_point_error
-from visualization import saveimfids, reindex, plot_results
+from visualization import saveimfids, plot_results
 
 def build_fiducials(initial, transforms, affine=False):
     '''
@@ -55,6 +55,20 @@ def build_fiducials(initial, transforms, affine=False):
         y += B.min_y() if round(B.min_y()) <= round(A.min_y()) else 0
         group_transform([C,D], x,y,th , unit='d', temp_center=temp_center)
     return [A, B, C, D]
+
+def header_row(param):
+    if param == 'overlap':
+        return ['overlap', 'err', 'time', 'success', 'total']
+
+    return ['overlap', param, 'err', 'time', 'success', 'total']
+
+def result_row(overlap, param, p_val, err, duration, success, total):
+    if param == 'overlap':
+        return { 'overlap': p_val, 'err': err, 'time': duration,
+            'success': success, 'total': total }
+
+    return { 'overlap': overlap, param: p_val, 'err': err,
+        'time': duration, 'success': success, 'total': total }
 
 def eval_method(image_name, method, debug=False, **kwargs):
     '''
@@ -98,6 +112,7 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
     multi_file = type(inputs) == list
     if multi_file:
         fail_thresh = 0.9
+        err_thresh = 51.2
     else:
         image_name = inputs
 
@@ -107,29 +122,26 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
             kw['overlap'] = overlap
         if multi_file:
             nan_count = 0
+            fail_count = 0
             duration_sum = 0
             err_sum = 0
             for f in inputs:
                 duration, err = eval_method(f, method, **kw)
-                if duration == 0 or err == np.NAN:
-                    nan_count += 1
+                if err > err_thresh or duration == 0 or err == np.NAN:
+                    fail_count += 1
                 else:
                     duration_sum += duration
                     err_sum += err
-            if nan_count >= fail_thresh * len(inputs):
-                row.append('(%.02f, %0.02fs)' % (np.NAN, 0))
-                print("%s: %0.2f, t: %0.2f, err: %0.2f, nan_count: %d/%d" %
-                    (param, val, 0, np.NAN, nan_count, len(inputs)))
-            else:
-                err      = err_sum / (len(inputs) - nan_count)
-                duration = duration_sum / (len(inputs) - nan_count)
-                row.append('(%.02f, %0.02fs)' %  (err, duration))
-                print("%s: %0.2f, t: %0.2f, err: %0.2f" %
-                    (param, val, duration, err))
+            successes = len(inputs)-fail_count
+            err      = err_sum / (len(inputs) - nan_count)
+            duration = duration_sum / (len(inputs) - nan_count)
+            row.append(result_row(overlap, param, val, err, duration, successes, len(inputs)))
+            print("%s: %0.2f, t: %0.2f, err: %0.2f, suc: %d/%d" %
+                (param, val, duration, err, successes, len(inputs)))
         else:
             duration, err = eval_method(image_name, method, **kw)
             print("%s: %0.2f, t: %0.2f, err: %0.2f" % (param, val, duration, err))
-            row.append('(%.02f, %0.02fs)' % (err, duration))
+            row.append(result_row(overlap, param, val, err, duration, 1, 1))
     return row
 
 def run_eval(inputs, method, noise=False, rotation=False, overlap=False,
@@ -153,60 +165,45 @@ def run_eval(inputs, method, noise=False, rotation=False, overlap=False,
 
     overlap_range = [o/100 for o in range(o_range[0], o_range[1]+1, o_range[2])]
     # overlap_range = [0.60, 0.75] # for smaller debug runs
-
     out = {}
     kw = {'downsample': downsample,
           'debug': kwargs['debug']}
     if noise:
+        param = 'noise'
         noise_range = [d / 1000 for d in range(0,51,10)]
-        table = []
+        df = pd.DataFrame([], columns=header_row(param))
         for o in overlap_range:
             kw['overlap'] = o
             if multi_file:
-                table.append(
-                    eval_param(files, method, 'noise', noise_range, **kw))
+                df = df.append(eval_param(files, method, param, noise_range, **kw))
             else:
-                table.append(
-                    eval_param(image_name, method, 'noise', noise_range, **kw))
-
-
-        df = pd.DataFrame(table, columns=noise_range, index=overlap_range)
-        df.index.names = ['overlap']
-        df.columns.names = ['noise']
-        df.columns = map(lambda x: '%.03f' % (x), noise_range)
-        out['noise'] = df
+                df = df.append(eval_param(image_name, method, param, noise_range, **kw))
+        out[param] = df
 
     if rotation:
+        param = 'rotation'
         r_range[1] += 1
         rot_range = range(*r_range)
         # rot_range = [-15, 0, 15] # for smaller debug runs
 
-        table = []
+        df = pd.DataFrame([], columns=header_row(param))
         for o in overlap_range:
             kw['overlap'] = o
             if multi_file:
-                table.append(
-                    eval_param(files, method, 'rotation', rot_range, **kw))
+                df = df.append(eval_param(files, method, param, rot_range, **kw))
             else:
-                table.append(
-                    eval_param(image_name, method, 'rotation', rot_range, **kw))
-
-        df = pd.DataFrame(table, columns=rot_range, index=overlap_range)
-        df.index.names = ['overlap']
-        df.columns.names = ['rotation']
-        df.columns = map(lambda x: '%d°' % (x), rot_range)
-        out['rotation'] = df
+                df = df.append(eval_param(image_name, method, param, rot_range, **kw))
+        out[param] = df
 
     if overlap:
+        param = 'overlap'
         if multi_file:
-            table = eval_param(files, method, 'overlap', overlap_range, **kw)
+            table = eval_param(files, method, param, overlap_range, **kw)
         else:
-            table = eval_param(image_name, method, 'overlap', overlap_range, **kw)
+            table = eval_param(image_name, method, param, overlap_range, **kw)
 
-        df = pd.DataFrame(table).transpose()
-        df.index.names = ['overlap']
-        df.columns = map(lambda x: '%.0f%%' % (x*100), overlap_range)
-        out['overlap'] = df
+        df = pd.DataFrame(table, columns=header_row(param))
+        out[param] = df
 
     return out
 
@@ -284,6 +281,7 @@ if __name__ == '__main__':
     parser.add_argument('-viz', '-vis', action='store_true',   \
                         help='create a heatmap of the results')
 
+    pd.options.display.float_format = '{:,.2f}'.format
     args = parser.parse_args()
     kw = vars(args)
     # get method to evaluate
@@ -308,11 +306,7 @@ if __name__ == '__main__':
             make_results_folder(folder_name)
 
         if kw['output']:
-            if results[k].shape[0] > 1:
-                df = reindex(results[k], k)
-                df.to_csv(outname + '.csv')
-            else:
-                results[k].to_csv(outname + '.csv')
+            results[k].to_csv(outname + '.csv', float_format='%0.03f')
 
         # output visualization
         if kw['viz']:
