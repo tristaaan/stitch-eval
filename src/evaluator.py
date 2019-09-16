@@ -58,16 +58,16 @@ def build_fiducials(initial, transforms, affine=False):
 
 def header_row(param):
     if param == 'overlap':
-        return ['overlap', 'err', 'time', 'success', 'total']
+        return ['overlap', 'error', 'time', 'success', 'total']
 
-    return ['overlap', param, 'err', 'time', 'success', 'total']
+    return ['overlap', param, 'error', 'time', 'success', 'total']
 
 def result_row(overlap, param, p_val, err, duration, success, total):
     if param == 'overlap':
-        return { 'overlap': p_val, 'err': err, 'time': duration,
+        return { 'overlap': p_val, 'error': err, 'time': duration,
             'success': success, 'total': total }
 
-    return { 'overlap': overlap, param: p_val, 'err': err,
+    return { 'overlap': overlap, param: p_val, 'error': err,
         'time': duration, 'success': success, 'total': total }
 
 def eval_method(image_name, method, debug=False, **kwargs):
@@ -111,8 +111,11 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
 
     multi_file = type(inputs) == list
     if multi_file:
-        fail_thresh = 0.9
-        err_thresh = 51.2
+        if downsample:
+            max_dim = downsample
+        else:
+            max_dim = max(imread(inputs[0]).shape)
+        err_thresh = max_dim / 10
     else:
         image_name = inputs
 
@@ -120,24 +123,31 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
         kw = { param: val, 'downsample': downsample, 'debug': debug }
         if param != 'overlap':
             kw['overlap'] = overlap
+        # perform evaluations over a directory of images
         if multi_file:
-            nan_count = 0
             fail_count = 0
             duration_sum = 0
             err_sum = 0
             for f in inputs:
                 duration, err = eval_method(f, method, **kw)
-                if err > err_thresh or duration == 0 or err == np.NAN:
+                if err > err_thresh or err == np.NAN or duration == 0:
                     fail_count += 1
                 else:
                     duration_sum += duration
                     err_sum += err
-            successes = len(inputs)-fail_count
-            err      = err_sum / (len(inputs) - nan_count)
-            duration = duration_sum / (len(inputs) - nan_count)
-            row.append(result_row(overlap, param, val, err, duration, successes, len(inputs)))
+            successes = len(inputs) - fail_count
+            if successes == 0:
+                err = np.NAN
+                duration = np.NAN
+            else:
+                err = err_sum / successes
+                duration = duration_sum / successes
+            row.append(
+                result_row(overlap, param, val, err, duration, successes, len(inputs))
+            )
             print("%s: %0.2f, t: %0.2f, err: %0.2f, suc: %d/%d" %
                 (param, val, duration, err, successes, len(inputs)))
+        # perform evaluations on a single image
         else:
             duration, err = eval_method(image_name, method, **kw)
             print("%s: %0.2f, t: %0.2f, err: %0.2f" % (param, val, duration, err))
