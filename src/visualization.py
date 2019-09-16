@@ -1,3 +1,4 @@
+import math
 import argparse
 import re
 from os import path
@@ -65,57 +66,35 @@ def reindex(table, param):
   return flat
 
 
-def plot_results(fname, results, param, image_size=512, needs_reindex=True):
+def plot_results(fname, results, param, image_size=512):
   '''
   visualize results in a seaborn annotated heatmap
   '''
-  if results.shape[0] == 1:
+  # if there is only the overlap param create a 1d plot.
+  if len(results.columns) == 5:
     plot_1d_results(fname, results, param)
     return
 
-  if needs_reindex:
-    results = reindex(results, param)
-  reformatted = results.pivot('overlap', param, 'error')
-
-  max_e = np.nanmax(results.error)
-  success_start = image_size / 10 / max_e
-  failure_end = success_start + 0.00001
-  tick_count = 5
-  tick = int(max_e / tick_count)
-  if success_start < max_e:
-    ticks = [success_start*max_e] + list(range(int(success_start*max_e + tick),\
-                                         int(max_e), tick-1)) + [max_e]
-  else:
-    ticks = [0,max_e]
-
+  reformatted = results.pivot('overlap', param, 'success')
+  errors      = results.pivot('overlap', param, 'error')
+  vmax = max(results[['total']].values)[0]
   sns.set()
   f, ax = plt.subplots(figsize=(9, 6))
-  if success_start < 1:
-    spread = [(0,    '#7EF249'),
-              (success_start, '#3FCD00'),
-              (failure_end,   '#FFF2F2'),
-              (1,    '#F2494C')]
-  else:
-    spread = [(0,    '#7EF249'),
-              (1,    '#3FCD00')]
-
-  cmap = clr.LinearSegmentedColormap.from_list('custom blue', spread, N=max_e)
-  sns.heatmap(reformatted, annot=True, fmt='.02f', cmap=cmap,  \
+  sns.heatmap(reformatted, annot=errors, fmt='0.02f', \
+              cmap=sns.color_palette("vlag_r", n_colors=vmax), \
               linewidths=.5, ax=ax, annot_kws={'rotation':40}, \
-              vmin=0, vmax=max_e,                 \
-              cbar_kws={'ticks': ticks})
+              vmin=0, vmax=vmax)
   plt.savefig('%s.png' % fname)
 
 
 def plot_1d_results(fname, results, param):
   # import pdb
   # pdb.set_trace()
-  vals    = list(map(lambda x: float(x.split(', ')[0].replace('(','')), \
-                     results.loc[0].values[1:]))
-  x_marks = list(map(lambda x: float(x.replace('%', '')), \
-                     results.columns.values[1:]))
-  print(vals, x_marks)
-  plt.plot(x_marks, vals)
+  vals    = results[['error']].values
+  sucs    = results[['success']].values
+  x_marks = list(map(lambda x: math.floor(x * 100), results[['overlap']].values))
+  # plt.plot(x_marks, vals)
+  plt.plot(x_marks, sucs)
   plt.savefig('%s.png' % fname)
 
 
@@ -132,5 +111,4 @@ if __name__ == '__main__':
   table = pd.read_csv(fname)
   outfile = path.basename(fname).split('.')[0]
 
-  plot_results(outfile, table, table.columns[2], \
-               image_size=kw['size'], needs_reindex=False)
+  plot_results(outfile, table, table.columns[2], image_size=kw['size'])
