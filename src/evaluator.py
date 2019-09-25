@@ -312,13 +312,13 @@ if __name__ == '__main__':
         folder_name = 'results'
         outname = os.path.join(folder_name, '%s_%s_%s' % \
                                (method, k, time.strftime('%d-%m_%H:%M')))
+        # create output folder
+        if kw['viz'] or kw['tex'] or kw['output']:
+            make_results_folder(folder_name)
+
         # save csv
         if kw['output']:
             results[k].to_csv(outname + '.csv', float_format='%0.03f')
-
-        # try viz
-        if kw['viz'] or kw['tex'] or kw['output']:
-            make_results_folder(folder_name)
 
         # output visualization
         if kw['viz']:

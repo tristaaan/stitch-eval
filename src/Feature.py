@@ -68,6 +68,10 @@ def stitch(im1, im2, matcher, get_keypoints):
     new_size = (int(w*2+x_offset), int(h*2+y_offset))
     affine_M = M[:2,:3]
 
+    # if the new size is too large report catastrophic failure
+    if max(map(abs, new_size)) > max(im1.shape) * 4:
+        return None, None, None
+
     # warp and paste
     warped = cv2.warpAffine(im2, affine_M, new_size, flags=cv2.INTER_CUBIC)
     base = eq_paste(im1, warped)
