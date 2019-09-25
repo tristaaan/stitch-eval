@@ -9,7 +9,6 @@ from imutils import rotate_bound
 from math import pi,sqrt
 from numpy.fft import fft2, ifft2
 from operator import mul
-from scipy import conj
 from scipy.signal import convolve2d
 from time import time
 
@@ -25,7 +24,7 @@ def norm_cross_power_spectrum(i1, i2):
         'images are different sizes: %s v %s' % (i1.shape, i2.shape,)
     f1 = fft2(i1)
     f2 = fft2(i2)
-    return (f1 * conj(f2)) / abs(f2 * conj(f2))
+    return (f1 * f2.conjugate()) / abs(f2 * f2.conjugate())
 
 
 def cross_power_spectrum(i1, i2):
@@ -37,7 +36,7 @@ def cross_power_spectrum(i1, i2):
         'images are different sizes: %s v %s' % (i1.shape, i2.shape,)
     f1 = fft2(i1)
     f2 = fft2(i2)
-    return (f1 * conj(f2)) / abs(f1 * conj(f2))
+    return (f1 * f2.conjugate()) / abs(f1 * f2.conjugate())
 
 
 def phase_correlation(i1, i2):
@@ -50,7 +49,7 @@ def phase_correlation(i1, i2):
         'images are different sizes: %s v %s' % (i1.shape, i2.shape,)
     f1 = fft2(i1)
     f2 = fft2(i2)
-    return (f1 * conj(f2)) / (abs(f1) * abs(f2))
+    return (f1 * f2.conjugate()) / (abs(f1) * abs(f2))
 
 
 def log_polar(img):
