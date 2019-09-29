@@ -10,6 +10,7 @@ import matplotlib.colors as clr
 import seaborn as sns
 import pandas as pd
 
+import pdb
 
 def saveimfids(fname, im, fids, truthy=[]):
     '''
@@ -78,13 +79,31 @@ def plot_results(fname, results, param, output_dir='.', image_size=512):
 
   reformatted = results.pivot('overlap', param, 'success')
   errors      = results.pivot('overlap', param, 'error')
-  vmax = np.nanmax(results[['total']])
+  vmax = results[['total']].values[0,0] + 1
   sns.set()
   f, ax = plt.subplots(figsize=(9, 6))
-  sns.heatmap(reformatted, annot=errors, fmt='0.02f', \
-              cmap=sns.color_palette("coolwarm_r", n_colors=vmax), \
-              linewidths=.5, ax=ax, annot_kws={'rotation':40}, \
-              vmin=0, vmax=vmax)
+  # define the color map, red to blue, no gray point
+  # very similar to sns.color_palette("coolwarm_r", n_colors=vmax)
+  spread = [
+    (0, '#BE2F33'),
+    (0.49, '#E6CEC2'),
+    (0.5, '#C7D4E8'),
+    (1, '#415DC9')
+  ]
+  cmap = clr.LinearSegmentedColormap.from_list('mmap', spread, N=vmax)
+  g = sns.heatmap(reformatted, annot=errors, fmt='0.01f', \
+            linewidths=.5, ax=ax, annot_kws={'rotation':40}, \
+            cmap=cmap, cbar_kws={'label': 'success'}, \
+            vmin=0, vmax=vmax)
+
+  # center the ticks on each segment of the color bar
+  # for some reason seaborn doesn't do this automatically
+  cbar = ax.collections[0].colorbar
+  tick_locs = np.arange(0,vmax,2) + 0.5
+  cbar.set_ticks(tick_locs)
+  cbar.set_ticklabels(np.arange(0,vmax,2))
+
+  # save fig
   plt.savefig(path.join(output_dir, ('%s.png' % fname)))
 
 
