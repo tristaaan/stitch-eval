@@ -275,9 +275,12 @@ if __name__ == '__main__':
                         type=arg_range, action='store', default=[-45,45,15])
 
     # other options
-    parser.add_argument('-file', '-f',       help='image filename', type=str,
-                        default='../data/T1_Img_002.00.tif')
-    parser.add_argument('-dir', '-d',        help='run evaluations on all images in a directory')
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument('-file', '-f', help='image filename', type=str,
+                             default='../data/T1_Img_002.00.tif')
+    input_group.add_argument('-dir', '-d',
+                             help='run evaluations on all images in a directory')
+
     parser.add_argument('-method', '-m',     help='method to evaluate', \
                         type=str, default='akaze')
     parser.add_argument('-downsample', '-ds', help='downsample images', \

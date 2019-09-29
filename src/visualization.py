@@ -1,5 +1,6 @@
-import math
 import argparse
+import glob
+import math
 import re
 from os import path
 
@@ -66,7 +67,7 @@ def reindex(table, param):
   return flat
 
 
-def plot_results(fname, results, param, image_size=512):
+def plot_results(fname, results, param, output_dir='.', image_size=512):
   '''
   visualize results in a seaborn annotated heatmap
   '''
@@ -77,14 +78,14 @@ def plot_results(fname, results, param, image_size=512):
 
   reformatted = results.pivot('overlap', param, 'success')
   errors      = results.pivot('overlap', param, 'error')
-  vmax = max(results[['total']].values)[0]
+  vmax = np.nanmax(results[['total']])
   sns.set()
   f, ax = plt.subplots(figsize=(9, 6))
   sns.heatmap(reformatted, annot=errors, fmt='0.02f', \
-              cmap=sns.color_palette("vlag_r", n_colors=vmax), \
+              cmap=sns.color_palette("coolwarm_r", n_colors=vmax), \
               linewidths=.5, ax=ax, annot_kws={'rotation':40}, \
               vmin=0, vmax=vmax)
-  plt.savefig('%s.png' % fname)
+  plt.savefig(path.join(output_dir, ('%s.png' % fname)))
 
 
 def plot_1d_results(fname, results, param):
@@ -98,17 +99,34 @@ def plot_1d_results(fname, results, param):
   plt.savefig('%s.png' % fname)
 
 
+def get_csvs_from_directory(directory):
+    return glob.glob(path.join(directory, '*.csv'))
+
+
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Visualize csv results')
-  parser.add_argument('-file', '-f', help='filename', type=str)
+  input_group = parser.add_mutually_exclusive_group(required=True)
+  input_group.add_argument('-file', '-f', help='input filename', type=str)
+  input_group.add_argument('-dir', '-d', help='input directory', type=str)
+  parser.add_argument('-o', help='output directory', type=str, default='.')
   parser.add_argument('-size', '-s', help='image size from the results to help' \
                                          +'determine the color scale', \
                                          type=int, default=512)
   args = parser.parse_args()
   kw = vars(args)
 
-  fname = kw['file']
-  table = pd.read_csv(fname)
-  outfile = path.basename(fname).split('.')[0]
-
-  plot_results(outfile, table, table.columns[2], image_size=kw['size'])
+  if kw['file']:
+    fname = kw['file']
+    table = pd.read_csv(fname)
+    outfile = path.basename(fname).split('.')[0]
+    plot_results(outfile, table, table.columns[2], image_size=kw['size'])
+  elif kw['dir']:
+    directory = kw['dir']
+    output_dir = kw['o']
+    files = get_csvs_from_directory(directory)
+    for file in files:
+      table = pd.read_csv(file)
+      outfile = path.basename(file).split('.')[0]
+      plot_results(outfile, table, table.columns[2],
+                   image_size=kw['size'], output_dir=output_dir)
+  print('visualization(s) complete')
