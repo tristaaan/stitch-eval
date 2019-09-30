@@ -10,7 +10,6 @@ import matplotlib.colors as clr
 import seaborn as sns
 import pandas as pd
 
-import pdb
 
 def saveimfids(fname, im, fids, truthy=[]):
     '''
@@ -48,33 +47,13 @@ def saveimfids(fname, im, fids, truthy=[]):
     fig.clf()
     plt.close(fig)
 
-
-def reindex(table, param):
-  '''
-  change table layout for heatmap
-  '''
-  assert table.shape[0] > 1, 'Cannot reindex table with one row'
-
-  ranges = table.columns
-  num_ranges = list(map(lambda x: float(re.sub(r'[°(db)%]','', x)), ranges))
-  flat = pd.DataFrame(columns=['overlap', param, 'error', 'time'])
-  for index, row in table.iterrows():
-    for i,v in enumerate(ranges):
-      cell = row[i]
-      err, duration = list(map(lambda c: float(re.sub(r'[\(\)s]', '', c)), \
-                           cell.split(', ')))
-      flat = flat.append({'overlap': index, param: num_ranges[i], \
-                         'time': duration, 'error': err}, ignore_index=True)
-  return flat
-
-
 def plot_results(fname, results, param, output_dir='.', image_size=512):
   '''
   visualize results in a seaborn annotated heatmap
   '''
   # if there is only the overlap param create a 1d plot.
-  if len(results.columns) == 5:
-    plot_1d_results(fname, results, param)
+  if param == 'overlap':
+    plot_1d_results(fname, results, param, output_dir=output_dir)
     return
 
   reformatted = results.pivot('overlap', param, 'success')
@@ -91,10 +70,10 @@ def plot_results(fname, results, param, output_dir='.', image_size=512):
     (1, '#415DC9')
   ]
   cmap = clr.LinearSegmentedColormap.from_list('mmap', spread, N=vmax)
-  g = sns.heatmap(reformatted, annot=errors, fmt='0.01f', \
-            linewidths=.5, ax=ax, annot_kws={'rotation':40}, \
-            cmap=cmap, cbar_kws={'label': 'success'}, \
-            vmin=0, vmax=vmax)
+  sns.heatmap(reformatted, annot=errors, fmt='0.01f', \
+              linewidths=.5, ax=ax, annot_kws={'rotation':40}, \
+              cmap=cmap, cbar_kws={'label': 'success'}, \
+              vmin=0, vmax=vmax)
 
   # center the ticks on each segment of the color bar
   # for some reason seaborn doesn't do this automatically
@@ -105,9 +84,12 @@ def plot_results(fname, results, param, output_dir='.', image_size=512):
 
   # save fig
   plt.savefig(path.join(output_dir, ('%s.png' % fname)))
+  # close in case of later reuse.
+  ax.cla()
+  f.clf()
+  plt.close(f)
 
-
-def plot_1d_results(fname, results, param):
+def plot_1d_results(fname, results, param, output_dir='.'):
   # import pdb
   # pdb.set_trace()
   vals    = results[['error']].values
@@ -115,8 +97,9 @@ def plot_1d_results(fname, results, param):
   x_marks = list(map(lambda x: math.floor(x * 100), results[['overlap']].values))
   # plt.plot(x_marks, vals)
   plt.plot(x_marks, sucs)
-  plt.savefig('%s.png' % fname)
-
+  plt.savefig(path.join(output_dir, ('%s.png' % fname)))
+  plt.clf()
+  plt.close()
 
 def get_csvs_from_directory(directory):
     return glob.glob(path.join(directory, '*.csv'))
@@ -138,14 +121,18 @@ if __name__ == '__main__':
     fname = kw['file']
     table = pd.read_csv(fname)
     outfile = path.basename(fname).split('.')[0]
-    plot_results(outfile, table, table.columns[2], image_size=kw['size'])
+    param = outfile.split('_')[-3]
+    plot_results(outfile, table, param, image_size=kw['size'])
+    print('visualization created')
   elif kw['dir']:
     directory = kw['dir']
     output_dir = kw['o']
     files = get_csvs_from_directory(directory)
-    for file in files:
-      table = pd.read_csv(file)
-      outfile = path.basename(file).split('.')[0]
-      plot_results(outfile, table, table.columns[2],
+    for f in files:
+      table = pd.read_csv(f)
+      outfile = path.basename(f).split('.')[0]
+      param = outfile.split('_')[-3]
+      print(f, param)
+      plot_results(outfile, table, param,
                    image_size=kw['size'], output_dir=output_dir)
-  print('visualization(s) complete')
+    print('%d visualization(s) created' % len(files))
