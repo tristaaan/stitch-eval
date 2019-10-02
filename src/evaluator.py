@@ -89,17 +89,17 @@ def eval_method(image_name, method, debug=False, **kwargs):
 
     # if debug, write the stitched image.
     if debug:
-        print(transforms[0], '\n', transforms[1], '\n', transforms[2])
-        fname = '../data/tmp/%s_%d_%.02f.tif' % \
-                (method.__name__, int(kwargs['overlap']*100), acc_result)
-        saveimfids(fname, stitched, copy.deepcopy(est_fiducials), truthy=ground_truth)
+        # print(transforms[0], '\n', transforms[1], '\n', transforms[2])
+        # fname = '../data/tmp/%s_%d_%.02f.tif' % \
+        #         (method.__name__, int(kwargs['overlap']*100), acc_result)
+        # saveimfids(fname, stitched, copy.deepcopy(est_fiducials), truthy=ground_truth)
         gc.collect() # cleans up matplot lib junk
 
     return (duration, acc_result)
 
 
 def eval_param(inputs, method, param, data_range, overlap=0.2,
-               downsample=False, debug=False):
+               downsample=False, record_all=False, debug=False):
     '''
     Run a study on a method given a single range of parameters with overlap
     '''
@@ -110,14 +110,14 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
         print('%s: %s, overlap: %0.2f' % (method.__name__, param, data_range[0]))
 
     multi_file = type(inputs) == list
-    if multi_file:
-        if downsample:
-            max_dim = downsample
-        else:
-            max_dim = max(imread(inputs[0]).shape)
-        err_thresh = max_dim / 10
-    else:
+    if not multi_file:
         image_name = inputs
+
+    if downsample:
+        max_dim = downsample
+    else:
+        max_dim = max(imread(inputs[0]).shape)
+    err_thresh = max_dim / 10
 
     for val in data_range:
         kw = { param: val, 'downsample': downsample, 'debug': debug }
@@ -125,33 +125,44 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
             kw['overlap'] = overlap
         # perform evaluations over a directory of images
         if multi_file:
-            fail_count = 0
+            success_count = 0
             duration_sum = 0
             err_sum = 0
+            # evaluate each image
             for f in inputs:
+                record = False
                 duration, err = eval_method(f, method, **kw)
-                if err > err_thresh or err == np.NAN or duration == 0:
-                    fail_count += 1
-                else:
+                # tally success
+                if err <= err_thresh and err != np.NAN:
+                    success_count += 1
+                    record = True
+                # add duration and error to sums
+                if record or record_all:
                     duration_sum += duration
                     err_sum += err
-            successes = len(inputs) - fail_count
-            if successes == 0:
+
+            # calculate average error
+            if not record_all and success_count == 0:
                 err = np.NAN
                 duration = np.NAN
+            elif record_all:
+                err = err_sum / len(inputs)
+                duration = duration_sum / len(inputs)
             else:
-                err = err_sum / successes
-                duration = duration_sum / successes
+                err = err_sum / success_count
+                duration = duration_sum / success_count
+            # append to dataframe
             row.append(
-                result_row(overlap, param, val, err, duration, successes, len(inputs))
+                result_row(overlap, param, val, err, duration, success_count, len(inputs))
             )
             print("%s: %0.2f, t: %0.2f, err: %0.2f, suc: %d/%d" %
-                (param, val, duration, err, successes, len(inputs)))
+                (param, val, duration, err, success_count, len(inputs)))
         # perform evaluations on a single image
         else:
             duration, err = eval_method(image_name, method, **kw)
             print("%s: %0.2f, t: %0.2f, err: %0.2f" % (param, val, duration, err))
-            row.append(result_row(overlap, param, val, err, duration, 1, 1))
+            row.append(result_row(overlap, param, val, err, duration,
+                                  int(err <= err_thresh), 1))
     return row
 
 def run_eval(inputs, method, noise=False, rotation=False, overlap=False,
@@ -177,7 +188,8 @@ def run_eval(inputs, method, noise=False, rotation=False, overlap=False,
     # overlap_range = [0.60, 0.75] # for smaller debug runs
     out = {}
     kw = {'downsample': downsample,
-          'debug': kwargs['debug']}
+          'debug': kwargs['debug'],
+          'record_all': kwargs['record_all']}
     if noise:
         param = 'noise'
         noise_range = [d / 1000 for d in range(0,51,10)]
@@ -289,6 +301,9 @@ if __name__ == '__main__':
                         help='output results to csv')
     parser.add_argument('-debug', action='store_true',   \
                         help='write the stitched image after each stitch')
+    parser.add_argument('-record_all', '-r', help='record all errors and average ' +
+                        'them regardless if they are under the error threshold', \
+                        action='store_true', default='akaze')
     parser.add_argument('-tex', action='store_true',   \
                         help='output results to LaTeX table')
     parser.add_argument('-viz', '-vis', action='store_true',   \
