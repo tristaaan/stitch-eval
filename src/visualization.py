@@ -108,11 +108,11 @@ def get_csvs_from_directory(directory):
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Visualize csv results')
   input_group = parser.add_mutually_exclusive_group(required=True)
-  input_group.add_argument('-file', '-f', help='input filename', type=str)
+  input_group.add_argument('-file', '-f', help='input csv', type=str)
   input_group.add_argument('-dir', '-d', help='input directory', type=str)
   parser.add_argument('-o', help='output directory', type=str, default='.')
   parser.add_argument('-size', '-s', help='image size from the results to help' \
-                                         +'determine the color scale', \
+                                         +' determine the color scale', \
                                          type=int, default=512)
   args = parser.parse_args()
   kw = vars(args)

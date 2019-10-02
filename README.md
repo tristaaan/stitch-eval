@@ -23,7 +23,7 @@ git submodule update --init
 
 ## Scripts
 
-### im_split.py
+### `im_split.py`
 
 ```py
 $ python im_split.py -h
@@ -47,12 +47,14 @@ optional arguments:
   -file FILE, -f FILE   image filename
 ```
 
-### evaluator.py
+### `evaluator.py`
 
 ```
 $ python evaluator.py -h
-usage: evaluator.py [-h] [-noise] [-rotation] [-overlap] [-file FILE]
+usage: evaluator.py [-h] [-noise] [-rotation] [-overlap] [-o_range O_RANGE]
+                    [-r_range R_RANGE] (-file FILE | -dir DIR)
                     [-method METHOD] [-downsample DOWNSAMPLE] [-output]
+                    [-debug] [-record_all] [-tex] [-viz]
 
 Run evaluations with a method
 
@@ -61,10 +63,36 @@ optional arguments:
   -noise                run noise evaluations
   -rotation             run rotation evaluations
   -overlap              run overlap evaluations
+  -o_range O_RANGE      range of overlap start:end:stride
+  -r_range R_RANGE      range of rotation, start:end:stride, for negative
+                        values use -r_range="..."
   -file FILE, -f FILE   image filename
+  -dir DIR, -d DIR      run evaluations on all images in a directory
   -method METHOD, -m METHOD
                         method to evaluate
   -downsample DOWNSAMPLE, -ds DOWNSAMPLE
                         downsample images
-  -output, -o           output results to LaTeX table
+  -output, -o           output results to csv
+  -debug                write the stitched image after each stitch
+  -record_all, -r       record all errors and average them regardless if they
+                        are under the error threshold
+  -tex                  output results to LaTeX table
+  -viz, -vis            create a heatmap of the results
+```
+
+### `visualization.py`
+
+```
+$ python visualization.py  -h
+usage: visualization.py [-h] (-file FILE | -dir DIR) [-o O] [-size SIZE]
+
+Visualize csv results
+
+optional arguments:
+  -h, --help           show this help message and exit
+  -file FILE, -f FILE  input filename
+  -dir DIR, -d DIR     input directory
+  -o O                 output directory
+  -size SIZE, -s SIZE  image size from the results to help determine the color
+                       scale
 ```
