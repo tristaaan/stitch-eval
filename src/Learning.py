@@ -100,40 +100,49 @@ def warp_merge(im1, im2, h):
     warped = rotate_bound(im2, th)
     return merge(im1, warped, x, y), [x,y,th]
 
-def est_transform(im1, im2, model, img_size):
+def resize(im, size):
+    return cv2.resize(im, size, interpolation=cv2.INTER_CUBIC)
+
+def est_transform(im1, im2, model, orig_size):
     '''
     Input two images into the model and return the estimated transform
     this could be more optimized by batching the transformation estimations
     instead of one at a time.
     '''
-    input_im1 = cv2.resize(im1, img_size, interpolation=cv2.INTER_CUBIC)
-    input_im2 = cv2.resize(im2, img_size, interpolation=cv2.INTER_CUBIC)
-    stack = np.dstack( (invert(input_im1), invert(input_im2)) )
+    stack = np.dstack( (invert(im1), invert(im2)) )
     stack = stack.reshape(1, *stack.shape)
     H = model.predict(stack)[0]
     if len(H) == 8:
         return H.reshape(4,2)
-    return H * [im1.shape[1], im1.shape[0]] # scale results
+    return H * list(orig_size)[::-1] # scale results
 
 def stitch_blocks(blocks, model, size):
-    A,B,C,D = blocks
-    if A.dtype == 'uint16':
-        A = uint16_to_uint8(A)
-        B = uint16_to_uint8(B)
-        C = uint16_to_uint8(C)
-        D = uint16_to_uint8(D)
+    # save original size
+    orig_size = blocks[0].shape[::-1]
+
+    # cast to uint8 if necessary
+    # in either case scale down images
+    if blocks[0].dtype == 'uint16':
+        A,B,C,D = map(lambda x: resize(x, size), map(uint16_to_uint8, blocks))
+    else:
+        A,B,C,D = map(lambda x: resize(x, size), blocks)
 
     start = time()
-    t_AB = est_transform(A, B, model, size)
-    t_CD = est_transform(C, D, model, size)
+    # get transforms
+    t_AB = est_transform(A, B, model, orig_size)
+    t_CD = est_transform(C, D, model, orig_size)
 
     # for the vertical component take the mean of AC and BD
-    t_AC = est_transform(A, C, model, size)
-    t_BD = est_transform(B, D, model, size)
+    t_AC = est_transform(A, C, model, orig_size)
+    t_BD = est_transform(B, D, model, orig_size)
     t_v = (t_AC + t_BD) / 2
+
+    # use original images from here on
+    A,B,C,D = blocks
 
     # translation net
     if t_AB.size == 2:
+        # stitch
         im_ab = merge(A, B, *t_AB)
         im_cd = merge(C, D, *t_CD)
         final = merge(im_ab, im_cd, *t_v)
@@ -152,6 +161,7 @@ def stitch_blocks(blocks, model, size):
     h_BD = points_to_affine(shape, t_BD)
     h_v = (h_AC + h_BD) / 2
 
+    # stitch
     im_ab, t1 = warp_merge(A, B, h_AB)
     im_cd, t2 = warp_merge(C, D, h_CD)
     final, t3 = warp_merge(im_ab, im_cd, h_v)
