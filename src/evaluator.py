@@ -303,7 +303,7 @@ if __name__ == '__main__':
                         help='write the stitched image after each stitch')
     parser.add_argument('-record_all', '-r', help='record all errors and average ' +
                         'them regardless if they are under the error threshold', \
-                        action='store_true', default='akaze')
+                        action='store_true')
     parser.add_argument('-tex', action='store_true',   \
                         help='output results to LaTeX table')
     parser.add_argument('-viz', '-vis', action='store_true',   \
