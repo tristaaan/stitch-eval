@@ -36,7 +36,7 @@ def cross_power_spectrum(i1, i2):
         'images are different sizes: %s v %s' % (i1.shape, i2.shape,)
     f1 = fft2(i1)
     f2 = fft2(i2)
-    return (f1 * f2.conjugate()) / abs(f1 * f2.conjugate())
+    return (f1.conjugate() * f2) / abs(f1.conjugate() * f2)
 
 
 def phase_correlation(i1, i2):
@@ -71,6 +71,7 @@ def is_square(im):
 
 def F_stitch(im1, im2):
     # start timer
+    f = phase_correlation
     start = time()
     zero = 500
 
@@ -91,7 +92,7 @@ def F_stitch(im1, im2):
     im2_p = log_polar(im2)
 
     # find correlation, enhance fft
-    impulse = ifft2(phase_correlation(im1_p, im2_p))
+    impulse = ifft2(f(im1_p, im2_p))
     theta, _ = np.unravel_index(np.argmax(impulse), impulse.shape)
 
     # calculate angle in degrees
@@ -123,7 +124,7 @@ def F_stitch(im1, im2):
     # find the x,y translation
     im1, im2 = ul_equalize(im1, im2)
 
-    impulse = ifft2(phase_correlation(im1, im2))
+    impulse = ifft2(f(im1, im2))
     y,x = np.unravel_index(np.argmax(impulse), impulse.shape)
 
     if y > im1.shape[0] // 2:
