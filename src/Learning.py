@@ -118,7 +118,7 @@ def est_transform(im1, im2, model, orig_size):
 
 def stitch_blocks(blocks, model, size):
     # save original size
-    orig_size = blocks[0].shape[::-1]
+    orig_size = blocks[0].shape
 
     # cast to uint8 if necessary
     # in either case scale down images
@@ -169,8 +169,8 @@ def stitch_blocks(blocks, model, size):
     # affine transforms kept as np arrays
     return (final, [t1,t2,t3], time() - start)
 
-def TN(blocks):
-    return stitch_blocks(blocks, translation_net(), (128,128))
+def TN(blocks, model):
+    return stitch_blocks(blocks, model, (128,128))
 
-def DHN(blocks):
-    return stitch_blocks(blocks, homography_net(), (128,128))
+def DHN(blocks, model):
+    return stitch_blocks(blocks, model, (128,128))

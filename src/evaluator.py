@@ -70,12 +70,30 @@ def result_row(overlap, param, p_val, err, duration, success, total):
     return { 'overlap': overlap, param: p_val, 'error': err,
         'time': duration, 'success': success, 'total': total }
 
+# model placeholder
+learning_model = None
+
 def eval_method(image_name, method, debug=False, **kwargs):
     '''
     Evaluate image stitching given an image, a method, and the splitting params
     '''
+    global learning_model
     blocks, ground_truth, initial = im_split(image_name, fiducials=True, **kwargs)
-    stitched, transforms, duration = method(blocks)
+    # it's expensive to reinitialize the learning models every time.
+    method_name = method.__name__.lower()
+    if method_name in ['tn', 'dhn']:
+        if learning_model == None:
+            if method_name == 'tn':
+                from Learning import translation_net
+                learning_model = translation_net()
+            elif method_name == 'dhn':
+                from Learning import homography_net
+                learning_model = homography_net()
+            else:
+                raise Error('unknown method name')
+        stitched, transforms, duration = method(blocks, learning_model)
+    else:
+        stitched, transforms, duration = method(blocks)
 
     # there was a catastrophic failure
     if duration == None:
@@ -250,7 +268,7 @@ def method_picker(name):
 
     # Do not import learning methods unless necessary, no need to instantiate
     # Tensorflow and Keras unless we need to.
-    if name == 'TN' or name == 'DHN':
+    if name.lower() == 'tn' or name.lower() == 'dhn':
         from Learning import DHN, TN
         methods += [DHN, TN]
 
