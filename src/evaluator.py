@@ -5,10 +5,12 @@ import glob
 import math
 import os
 import time
+import json
 
 import numpy as np
 import pandas as pd
 
+from functools import reduce
 from cv2 import imread
 from os import path
 
@@ -58,17 +60,17 @@ def build_fiducials(initial, transforms, affine=False):
 
 def header_row(param):
     if param == 'overlap':
-        return ['overlap', 'error', 'time', 'success', 'total']
+        return ['overlap', 'results', 'total', 'size']
 
-    return ['overlap', param, 'error', 'time', 'success', 'total']
+    return ['overlap', param, 'results', 'total', 'size']
 
-def result_row(overlap, param, p_val, err, duration, success, total):
+def result_row(overlap, param, p_val, results, total, size):
     if param == 'overlap':
-        return { 'overlap': p_val, 'error': err, 'time': duration,
-            'success': success, 'total': total }
+        return { 'overlap': p_val, 'results':results,
+            'total': total, 'size': size }
 
-    return { 'overlap': overlap, param: p_val, 'error': err,
-        'time': duration, 'success': success, 'total': total }
+    return { 'overlap': overlap, param: p_val, 'results': json.dumps(results),
+        'total': total, 'size': size }
 
 # model placeholder
 learning_model = None
@@ -131,11 +133,12 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
     if not multi_file:
         image_name = inputs
 
-    if downsample:
-        max_dim = downsample
-    else:
-        max_dim = max(imread(inputs[0]).shape)
-    err_thresh = max_dim / 10
+    if downsample != False:
+        image_size = downsample
+    elif multi_file:
+        image_size = max(imread(inputs[0]).shape)
+    else: # not multi_file, no downsample
+        image_size = max(imread(image_name).shape)
 
     for val in data_range:
         kw = { param: val, 'downsample': downsample, 'debug': debug }
@@ -143,44 +146,28 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
             kw['overlap'] = overlap
         # perform evaluations over a directory of images
         if multi_file:
-            success_count = 0
-            duration_sum = 0
-            err_sum = 0
+            json_record = {}
             # evaluate each image
-            for f in inputs:
-                record = False
+            for i, f in enumerate(inputs):
                 duration, err = eval_method(f, method, **kw)
-                # tally success
-                if err <= err_thresh and err != np.NAN:
-                    success_count += 1
-                    record = True
-                # add duration and error to sums
-                if record or record_all:
-                    duration_sum += duration
-                    err_sum += err
-
-            # calculate average error
-            if not record_all and success_count == 0:
-                err = np.NAN
-                duration = np.NAN
-            elif record_all:
-                err = err_sum / len(inputs)
-                duration = duration_sum / len(inputs)
-            else:
-                err = err_sum / success_count
-                duration = duration_sum / success_count
-            # append to dataframe
+                json_record[f] = {
+                    'err': err,
+                    'time': duration
+                }
             row.append(
-                result_row(overlap, param, val, err, duration, success_count, len(inputs))
+                result_row(overlap, param, val, json_record, len(inputs), image_size)
             )
-            print("%s: %0.2f, t: %0.2f, err: %0.2f, suc: %d/%d" %
-                (param, val, duration, err, success_count, len(inputs)))
+            avg_duration = reduce(lambda prev,cur: prev+cur['time'], json_record.values(), 0)
+            min_err = min(map(lambda cur: cur['err'], json_record.values()))
+            max_err = max(map(lambda cur: cur['err'], json_record.values()))
+            print("%s: %0.2f, t: %0.2f, min_err: %0.2f, max_err: %0.2f" %
+                (param, val, avg_duration, min_err, max_err))
         # perform evaluations on a single image
         else:
             duration, err = eval_method(image_name, method, **kw)
             print("%s: %0.2f, t: %0.2f, err: %0.2f" % (param, val, duration, err))
-            row.append(result_row(overlap, param, val, err, duration,
-                                  int(err <= err_thresh), 1))
+            row.append(result_row(overlap, param, val, {'err': err, 'time': duration},
+                                  1, image_size))
     return row
 
 def run_eval(inputs, method, noise=False, rotation=False, overlap=False,
@@ -342,8 +329,6 @@ if __name__ == '__main__':
 
     # write output
     for k in results.keys():
-        print(results[k])
-
         # create output folder if needed
         folder_name = 'results'
         outname = os.path.join(folder_name, '%s_%s_%s' % \
@@ -355,6 +340,7 @@ if __name__ == '__main__':
         # save csv
         if kw['output']:
             results[k].to_csv(outname + '.csv', float_format='%0.03f')
+            print('csv output saved')
 
         # output visualization
         if kw['viz']:
@@ -366,6 +352,7 @@ if __name__ == '__main__':
             else:
                 image_size = max(imread(kw['file']).shape)
             plot_results(outname, results[k], k, image_size=image_size)
+            print('results visualized and saved')
 
         # create latex table output
         if kw['tex']:
@@ -382,6 +369,7 @@ if __name__ == '__main__':
                 fi.write(latex_str)
                 fi.write('\\caption{%s}\n' % caption)
                 fi.write('\\end{table}\n')
+            print('LaTeX table saved')
 
     print('done')
 
