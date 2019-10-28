@@ -17,7 +17,7 @@ from os import path
 from im_split import im_split
 from Fiducials import Fiducial_corners, group_transform, \
                       group_transform_affine, zero_group
-from measurements import fiducial_point_error
+from measurements import average_corner_error
 from visualization import saveimfids, plot_results
 
 def build_fiducials(initial, transforms, affine=False):
@@ -60,17 +60,16 @@ def build_fiducials(initial, transforms, affine=False):
 
 def header_row(param):
     if param == 'overlap':
-        return ['overlap', 'results', 'total', 'size']
+        return ['overlap', 'results', 'size']
 
-    return ['overlap', param, 'results', 'total', 'size']
+    return ['overlap', param, 'results', 'size']
 
-def result_row(overlap, param, p_val, results, total, size):
+def result_row(overlap, param, p_val, results, size):
     if param == 'overlap':
-        return { 'overlap': p_val, 'results':results,
-            'total': total, 'size': size }
+        return { 'overlap': p_val, 'results':results, 'size': size }
 
     return { 'overlap': overlap, param: p_val, 'results': json.dumps(results),
-        'total': total, 'size': size }
+        'size': size }
 
 # model placeholder
 learning_model = None
@@ -105,7 +104,7 @@ def eval_method(image_name, method, debug=False, **kwargs):
                                     affine=hasattr(transforms[0],'shape'))
 
     # compare the estimated ones with the ground_truth ones.
-    acc_result = fiducial_point_error(ground_truth, est_fiducials)
+    average_err, min_err, max_err = average_corner_error(ground_truth, est_fiducials)
 
     # if debug, write the stitched image.
     if debug:
@@ -115,7 +114,7 @@ def eval_method(image_name, method, debug=False, **kwargs):
         # saveimfids(fname, stitched, copy.deepcopy(est_fiducials), truthy=ground_truth)
         gc.collect() # cleans up matplot lib junk
 
-    return (duration, acc_result)
+    return (duration, average_err, min_err, max_err)
 
 
 def eval_param(inputs, method, param, data_range, overlap=0.2,
@@ -149,13 +148,15 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
             json_record = {}
             # evaluate each image
             for i, f in enumerate(inputs):
-                duration, err = eval_method(f, method, **kw)
+                duration, err, min_err, max_err = eval_method(f, method, **kw)
                 json_record[f] = {
                     'err': err,
-                    'time': duration
+                    'time': duration,
+                    'min': min_err,
+                    'max': max_err
                 }
             row.append(
-                result_row(overlap, param, val, json_record, len(inputs), image_size)
+                result_row(overlap, param, val, json_record, image_size)
             )
             avg_duration = reduce(lambda prev,cur: prev+cur['time'], json_record.values(), 0)
             min_err = min(map(lambda cur: cur['err'], json_record.values()))
@@ -164,10 +165,15 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
                 (param, val, avg_duration, min_err, max_err))
         # perform evaluations on a single image
         else:
-            duration, err = eval_method(image_name, method, **kw)
+            duration, err, min_err, max_err = eval_method(image_name, method, **kw)
             print("%s: %0.2f, t: %0.2f, err: %0.2f" % (param, val, duration, err))
-            row.append(result_row(overlap, param, val, {'err': err, 'time': duration},
-                                  1, image_size))
+            record = {
+                'err': err,
+                'time': duration,
+                'min': min_err,
+                'max': max_err
+            }
+            row.append(result_row(overlap, param, val, record, image_size))
     return row
 
 def run_eval(inputs, method, noise=False, rotation=False, overlap=False,
