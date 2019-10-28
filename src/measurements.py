@@ -21,7 +21,7 @@ def average_corner_error(gt, est):
             dist(g[l].tr, e[l].tr) + \
             dist(g[l].br, e[l].br) + \
             dist(g[l].bl, e[l].bl)
-        if diff < min_err
+        if diff < min_err:
             min_err = diff
         if diff > max_err:
             max_err = diff
