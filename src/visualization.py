@@ -102,7 +102,7 @@ def plot_results(fname, results, param, threshold, output_dir='.'):
   sns.heatmap(reformatted, annot=errors, fmt='0.01f', \
               linewidths=.5, ax=ax, annot_kws={'rotation':40}, \
               cmap=cmap, cbar_kws={'label': 'success'}, \
-              vmin=0, vmax=vmax)
+              vmin=0, vmax=vmax+1)
 
   # center the ticks on each segment of the color bar
   # for some reason seaborn doesn't do this automatically
@@ -123,9 +123,13 @@ def plot_1d_results(fname, results, param, threshold, output_dir='.'):
   print(parsed_results)
   vals    = parsed_results[['error']].values
   sucs    = parsed_results[['success']].values
+  names=['%d%%' % s for s in range(10,101,10)]
   x_marks = list(map(lambda x: math.floor(x * 100), parsed_results[['overlap']].values))
-  # plt.plot(x_marks, vals)
-  plt.plot(x_marks, sucs)
+
+  fig, ax = plt.subplots()
+  ax.plot(x_marks, sucs)
+  ax.set_xticks(x_marks)
+  ax.set_xticklabels(names)
   plt.savefig(path.join(output_dir, ('%s.png' % fname)))
   plt.clf()
   plt.close()
