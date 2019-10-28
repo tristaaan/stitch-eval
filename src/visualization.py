@@ -2,6 +2,7 @@ import argparse
 import glob
 import math
 import re
+import json
 from os import path
 
 import numpy as np
@@ -47,18 +48,46 @@ def saveimfids(fname, im, fids, truthy=[]):
     fig.clf()
     plt.close(fig)
 
-def plot_results(fname, results, param, output_dir='.', image_size=512):
+
+def prepare_table(df, threshold):
+  '''
+  read json results, append columns: success and error
+  '''
+  results = df[['results']].values
+  error = []
+  success = []
+  vmax = 0
+  for json_result in results:
+    mstr = json_result[0].replace('\'', '"')
+    result = json.loads(mstr)
+    avg_err = 0
+    suc = 0
+    vmax = len(result)
+    for record in result.values():
+      max_err = record['max']
+      if max_err != 'inf' and max_err <= threshold:
+        avg_err += record['err']
+        suc += 1
+    error.append(avg_err / len(result))
+    success.append(suc)
+  print(error, success)
+  cols = pd.DataFrame({'error': error, 'success': success})
+  print(cols)
+  return pd.concat([df, cols], axis=1), vmax
+
+
+def plot_results(fname, results, param, threshold, output_dir='.'):
   '''
   visualize results in a seaborn annotated heatmap
   '''
   # if there is only the overlap param create a 1d plot.
   if param == 'overlap':
-    plot_1d_results(fname, results, param, output_dir=output_dir)
+    plot_1d_results(fname, results, param, threshold, output_dir=output_dir)
     return
 
+  parsed_results, vmax = prepare_table(results, threshold)
   reformatted = results.pivot('overlap', param, 'success')
   errors      = results.pivot('overlap', param, 'error')
-  vmax = results[['total']].values[0,0] + 1
   sns.set()
   f, ax = plt.subplots(figsize=(9, 6))
   # define the color map, red to blue, no gray point
@@ -89,12 +118,12 @@ def plot_results(fname, results, param, output_dir='.', image_size=512):
   f.clf()
   plt.close(f)
 
-def plot_1d_results(fname, results, param, output_dir='.'):
-  # import pdb
-  # pdb.set_trace()
-  vals    = results[['error']].values
-  sucs    = results[['success']].values
-  x_marks = list(map(lambda x: math.floor(x * 100), results[['overlap']].values))
+def plot_1d_results(fname, results, param, threshold, output_dir='.'):
+  parsed_results, _ = prepare_table(results, threshold)
+  print(parsed_results)
+  vals    = parsed_results[['error']].values
+  sucs    = parsed_results[['success']].values
+  x_marks = list(map(lambda x: math.floor(x * 100), parsed_results[['overlap']].values))
   # plt.plot(x_marks, vals)
   plt.plot(x_marks, sucs)
   plt.savefig(path.join(output_dir, ('%s.png' % fname)))
@@ -111,18 +140,18 @@ if __name__ == '__main__':
   input_group.add_argument('-file', '-f', help='input csv', type=str)
   input_group.add_argument('-dir', '-d', help='input directory', type=str)
   parser.add_argument('-o', help='output directory', type=str, default='.')
-  parser.add_argument('-size', '-s', help='image size from the results to help' \
-                                         +' determine the color scale', \
-                                         type=int, default=512)
+  parser.add_argument('-threshold', '-t', help='error threshold', type=float, default=1.0)
+
   args = parser.parse_args()
   kw = vars(args)
+  params = re.compile(r'(overlap|noise|rotation)')
 
   if kw['file']:
     fname = kw['file']
     table = pd.read_csv(fname)
     outfile = path.basename(fname).split('.')[0]
-    param = outfile.split('_')[-3]
-    plot_results(outfile, table, param, image_size=kw['size'])
+    param = params.findall(outfile)[0]
+    plot_results(outfile, table, param, kw['threshold'])
     print('visualization created')
   elif kw['dir']:
     directory = kw['dir']
@@ -131,8 +160,7 @@ if __name__ == '__main__':
     for f in files:
       table = pd.read_csv(f)
       outfile = path.basename(f).split('.')[0]
-      param = outfile.split('_')[-3]
+      param = params.findall(outfile)[0]
       print(f, param)
-      plot_results(outfile, table, param,
-                   image_size=kw['size'], output_dir=output_dir)
+      plot_results(outfile, table, param, kw['threshold'], output_dir=output_dir)
     print('%d visualization(s) created' % len(files))

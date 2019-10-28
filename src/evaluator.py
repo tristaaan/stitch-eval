@@ -98,7 +98,7 @@ def eval_method(image_name, method, debug=False, **kwargs):
 
     # there was a catastrophic failure
     if duration == None:
-        return (0, np.NAN)
+        return (0, 'inf', 'inf', 'inf')
     # with the transformations, construct estimated fiducials
     est_fiducials = build_fiducials(initial, transforms, \
                                     affine=hasattr(transforms[0],'shape'))
@@ -315,8 +315,6 @@ if __name__ == '__main__':
     parser.add_argument('-record_all', '-r', help='record all errors and average ' +
                         'them regardless if they are under the error threshold', \
                         action='store_true')
-    parser.add_argument('-tex', action='store_true',   \
-                        help='output results to LaTeX table')
     parser.add_argument('-viz', '-vis', action='store_true',   \
                         help='create a heatmap of the results')
 
@@ -340,12 +338,12 @@ if __name__ == '__main__':
         outname = os.path.join(folder_name, '%s_%s_%s' % \
                                (method, k, time.strftime('%d-%m_%H:%M')))
         # create output folder
-        if kw['viz'] or kw['tex'] or kw['output']:
+        if kw['viz'] or kw['output']:
             make_results_folder(folder_name)
 
         # save csv
         if kw['output']:
-            results[k].to_csv(outname + '.csv', float_format='%0.03f')
+            results[k].to_csv(outname + '.csv')
             print('csv output saved')
 
         # output visualization
@@ -359,23 +357,6 @@ if __name__ == '__main__':
                 image_size = max(imread(kw['file']).shape)
             plot_results(outname, results[k], k, image_size=image_size)
             print('results visualized and saved')
-
-        # create latex table output
-        if kw['tex']:
-            latex_str = results[k].to_latex() \
-                                  .replace('°', '\\degree') # usepackage{gensymb}
-            results[k].to_csv(outname + '.csv')
-            with open(outname + '.tex', 'w') as fi:
-                caption = ('%s results for %s method.' % (k[0].upper() + k[1:],
-                                                         method)).replace('_', '\\_')
-                if kw['downsample']:
-                    ds = kw['downsample']
-                    caption += ' Base image downsampled to $%d\\times%d$ pixels.' % (ds, ds)
-                fi.write('\\begin{table}\n\\centering\n')
-                fi.write(latex_str)
-                fi.write('\\caption{%s}\n' % caption)
-                fi.write('\\end{table}\n')
-            print('LaTeX table saved')
 
     print('done')
 
