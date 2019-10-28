@@ -159,14 +159,23 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
                 result_row(overlap, param, val, json_record, image_size)
             )
             avg_duration = reduce(lambda prev,cur: prev+cur['time'], json_record.values(), 0)
-            min_err = min(map(lambda cur: cur['err'], json_record.values()))
-            max_err = max(map(lambda cur: cur['err'], json_record.values()))
-            print("%s: %0.2f, t: %0.2f, min_err: %0.2f, max_err: %0.2f" %
-                (param, val, avg_duration, min_err, max_err))
+            vals = list(filter(lambda val: type(val) != str,
+                map(lambda cur: cur['err'], json_record.values())
+            ))
+            if len(vals) == 0:
+                min_err = 'na'
+                max_err = 'na'
+                print("{}: {:0.2f}, t: {}, min_err: {}, max_err: {}"
+                    .format(param, val, avg_duration, min_err, max_err))
+            else:
+                min_err = min(vals)
+                max_err = max(vals)
+                print("{}: {:0.2f}, t: {:0.2f}, min_err: {:0.2f}, max_err: {:0.2f}"
+                    .format(param, val, avg_duration, min_err, max_err))
         # perform evaluations on a single image
         else:
             duration, err, min_err, max_err = eval_method(image_name, method, **kw)
-            print("%s: %0.2f, t: %0.2f, err: %0.2f" % (param, val, duration, err))
+            print("{}: {:0.2f}, t: {}, err: {}".format(param, val, duration, err))
             record = {
                 'err': err,
                 'time': duration,

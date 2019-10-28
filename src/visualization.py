@@ -70,9 +70,7 @@ def prepare_table(df, threshold):
         suc += 1
     error.append(avg_err / len(result))
     success.append(suc)
-  print(error, success)
   cols = pd.DataFrame({'error': error, 'success': success})
-  print(cols)
   return pd.concat([df, cols], axis=1), vmax
 
 
@@ -86,8 +84,8 @@ def plot_results(fname, results, param, threshold, output_dir='.'):
     return
 
   parsed_results, vmax = prepare_table(results, threshold)
-  reformatted = results.pivot('overlap', param, 'success')
-  errors      = results.pivot('overlap', param, 'error')
+  successes = parsed_results.pivot('overlap', param, 'success')
+  errors    = parsed_results.pivot('overlap', param, 'error')
   sns.set()
   f, ax = plt.subplots(figsize=(9, 6))
   # define the color map, red to blue, no gray point
@@ -99,10 +97,10 @@ def plot_results(fname, results, param, threshold, output_dir='.'):
     (1, '#415DC9')
   ]
   cmap = clr.LinearSegmentedColormap.from_list('mmap', spread, N=vmax)
-  sns.heatmap(reformatted, annot=errors, fmt='0.01f', \
+  sns.heatmap(successes, annot=errors, fmt='0.01f', \
               linewidths=.5, ax=ax, annot_kws={'rotation':40}, \
               cmap=cmap, cbar_kws={'label': 'success'}, \
-              vmin=0, vmax=vmax+1)
+              vmin=0, vmax=vmax)
 
   # center the ticks on each segment of the color bar
   # for some reason seaborn doesn't do this automatically
@@ -120,7 +118,6 @@ def plot_results(fname, results, param, threshold, output_dir='.'):
 
 def plot_1d_results(fname, results, param, threshold, output_dir='.'):
   parsed_results, _ = prepare_table(results, threshold)
-  print(parsed_results)
   vals    = parsed_results[['error']].values
   sucs    = parsed_results[['success']].values
   names=['%d%%' % s for s in range(10,101,10)]
