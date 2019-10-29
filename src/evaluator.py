@@ -341,18 +341,18 @@ if __name__ == '__main__':
         results = run_eval(kw['file'], **kw)
 
     # write output
-    for k in results.keys():
+    for param in results.keys():
         # create output folder if needed
         folder_name = 'results'
         outname = os.path.join(folder_name, '%s_%s_%s' % \
-                               (method, k, time.strftime('%d-%m_%H:%M')))
+                               (method, param, time.strftime('%d-%m_%H:%M')))
         # create output folder
         if kw['viz'] or kw['output']:
             make_results_folder(folder_name)
 
         # save csv
         if kw['output']:
-            results[k].to_csv(outname + '.csv')
+            results[param].to_csv(outname + '.csv')
             print('csv output saved')
 
         # output visualization
@@ -364,7 +364,8 @@ if __name__ == '__main__':
                 image_size = max(imread(files[0]).shape)
             else:
                 image_size = max(imread(kw['file']).shape)
-            plot_results(outname, results[k], k, image_size=image_size)
+            # plot with an error threshold of 1
+            plot_results(outname, results[param], param, 1)
             print('results visualized and saved')
 
     print('done')
