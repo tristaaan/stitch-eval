@@ -357,13 +357,6 @@ if __name__ == '__main__':
 
         # output visualization
         if kw['viz']:
-            if kw['downsample'] > 0:
-                image_size = kw['downsample']
-            elif kw['dir']:
-                files = get_images_from_directory(kw['dir'])
-                image_size = max(imread(files[0]).shape)
-            else:
-                image_size = max(imread(kw['file']).shape)
             # plot with an error threshold of 1
             plot_results(outname, results[param], param, 1)
             print('results visualized and saved')

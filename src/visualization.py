@@ -97,7 +97,7 @@ def plot_results(fname, results, param, threshold, output_dir='.'):
     (1, '#415DC9')
   ]
   cmap = clr.LinearSegmentedColormap.from_list('mmap', spread, N=vmax)
-  sns.heatmap(successes, annot=errors, fmt='0.01f', \
+  sns.heatmap(successes, annot=errors, fmt='0.02f', \
               linewidths=.5, ax=ax, annot_kws={'rotation':40}, \
               cmap=cmap, cbar_kws={'label': 'success'}, \
               vmin=0, vmax=vmax)
