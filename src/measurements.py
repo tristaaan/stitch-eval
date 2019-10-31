@@ -18,9 +18,9 @@ def average_corner_error(gt, est):
     err = 0
     for l in labels[1:]: # the first points' error will always be 0
         diff = dist(g[l].tl, e[l].tl) + \
-            dist(g[l].tr, e[l].tr) + \
-            dist(g[l].br, e[l].br) + \
-            dist(g[l].bl, e[l].bl)
+               dist(g[l].tr, e[l].tr) + \
+               dist(g[l].br, e[l].br) + \
+               dist(g[l].bl, e[l].bl)
         if diff < min_err:
             min_err = diff
         if diff > max_err:

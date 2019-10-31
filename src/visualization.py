@@ -51,13 +51,14 @@ def saveimfids(fname, im, fids, truthy=[]):
 
 def prepare_table(df, threshold):
   '''
-  read json results, append columns: success and error
+  read json results, append columns: 'success' and 'error'
   '''
   results = df[['results']].values
   error = []
   success = []
   vmax = 0
   for json_result in results:
+    # correct json syntax so it can be loaded
     mstr = json_result[0].replace('\'', '"')
     result = json.loads(mstr)
     avg_err = 0
@@ -65,12 +66,20 @@ def prepare_table(df, threshold):
     vmax = len(result)
     for record in result.values():
       max_err = record['max']
+      # if the max error is under the threshold record the error
       if max_err != 'inf' and max_err <= threshold:
         avg_err += record['err']
         suc += 1
-    error.append(avg_err / len(result))
+    # record average successful error
+    if suc > 0:
+      error.append(avg_err / suc)
+    # otherwise record -1
+    else:
+      error.append(-1)
     success.append(suc)
+  # create new df with new columns
   cols = pd.DataFrame({'error': error, 'success': success})
+  # concatenate the csv and the new columns
   return pd.concat([df, cols], axis=1), vmax
 
 
