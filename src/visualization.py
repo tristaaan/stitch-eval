@@ -65,7 +65,7 @@ def prepare_table(df, threshold):
     suc = 0
     vmax = len(result)
     for record in result.values():
-      max_err = record['max']
+      max_err = float(record['max']) / 4 # average this
       # if the max error is under the threshold record the error
       if max_err != 'inf' and max_err <= threshold:
         avg_err += record['err']
