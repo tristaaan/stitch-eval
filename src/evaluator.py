@@ -108,10 +108,10 @@ def eval_method(image_name, method, debug=False, **kwargs):
 
     # if debug, write the stitched image.
     if debug:
-        # print(transforms[0], '\n', transforms[1], '\n', transforms[2])
-        # fname = '../data/tmp/%s_%d_%.02f.tif' % \
-        #         (method.__name__, int(kwargs['overlap']*100), acc_result)
-        # saveimfids(fname, stitched, copy.deepcopy(est_fiducials), truthy=ground_truth)
+        print(transforms[0], '\n', transforms[1], '\n', transforms[2])
+        fname = '../data/tmp/%s_%d_%.02f_%.02f.tif' % \
+                (method.__name__, int(kwargs['overlap']*100), average_err, max_err/4)
+        saveimfids(fname, stitched, copy.deepcopy(est_fiducials), truthy=ground_truth)
         gc.collect() # cleans up matplot lib junk
 
     return (duration, average_err, min_err, max_err)
