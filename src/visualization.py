@@ -72,10 +72,10 @@ def prepare_table(df, threshold):
         suc += 1
     # record average successful error
     if suc > 0:
-      error.append(avg_err / suc)
+      error.append('%0.02f' % (avg_err / suc))
     # otherwise record -1
     else:
-      error.append(-1)
+      error.append('')
     success.append(suc)
   # create new df with new columns
   cols = pd.DataFrame({'error': error, 'success': success})
@@ -107,7 +107,7 @@ def plot_results(fname, results, param, threshold, output_dir='.'):
   ]
   vmax += 1
   cmap = clr.LinearSegmentedColormap.from_list('mmap', spread, N=vmax)
-  sns.heatmap(successes, annot=errors, fmt='0.02f', \
+  sns.heatmap(successes, annot=errors, fmt='s', \
               linewidths=.5, ax=ax, annot_kws={'rotation':40}, \
               cmap=cmap, cbar_kws={'label': 'success'}, \
               vmin=0, vmax=vmax)
