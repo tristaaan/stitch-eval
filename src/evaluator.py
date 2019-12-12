@@ -66,7 +66,7 @@ def header_row(param):
 
 def result_row(overlap, param, p_val, results, size):
     if param == 'overlap':
-        return { 'overlap': p_val, 'results':results, 'size': size }
+        return { 'overlap': p_val, 'results': json.dumps(results), 'size': size }
 
     return { 'overlap': overlap, param: p_val, 'results': json.dumps(results),
         'size': size }
