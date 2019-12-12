@@ -79,20 +79,24 @@ def prepare_table(df, threshold):
     success.append(suc)
   # create new df with new columns
   cols = pd.DataFrame({'error': error, 'success': success})
+  df = df.reset_index()
   # concatenate the csv and the new columns
   return pd.concat([df, cols], axis=1), vmax
 
 
-def plot_results(fname, results, param, threshold, output_dir='.'):
+def plot_results(fname, results, param, threshold, output_dir='.', savecsv=False):
   '''
   visualize results in a seaborn annotated heatmap
   '''
   # if there is only the overlap param create a 1d plot.
   if param == 'overlap':
-    plot_1d_results(fname, results, param, threshold, output_dir=output_dir)
+    plot_1d_results(fname, results, param, threshold,
+                    output_dir=output_dir, savecsv=savecsv)
     return
 
   parsed_results, vmax = prepare_table(results, threshold)
+  if savecsv:
+    parsed_results.to_csv(path.join(output_dir, fname + '_parsed.csv'))
   successes = parsed_results.pivot('overlap', param, 'success')
   errors    = parsed_results.pivot('overlap', param, 'error')
   sns.set()
@@ -126,8 +130,10 @@ def plot_results(fname, results, param, threshold, output_dir='.'):
   f.clf()
   plt.close(f)
 
-def plot_1d_results(fname, results, param, threshold, output_dir='.'):
+def plot_1d_results(fname, results, param, threshold, output_dir='.', savecsv=False):
   parsed_results, _ = prepare_table(results, threshold)
+  if savecsv:
+    parsed_results.to_csv(path.join(output_dir, fname + '_parsed.csv'))
   vals    = parsed_results[['error']].values
   sucs    = parsed_results[['success']].values
   names=['%d%%' % s for s in range(10,101,10)]
@@ -152,6 +158,8 @@ if __name__ == '__main__':
   input_group.add_argument('-dir', '-d', help='input directory', type=str)
   parser.add_argument('-o', help='output directory', type=str, default='.')
   parser.add_argument('-threshold', '-t', help='error threshold', type=float, default=1.0)
+  parser.add_argument('-save_csvs', '-s', help='save csv\'s with error and success columns',
+                      action='store_true', default=False)
 
   args = parser.parse_args()
   kw = vars(args)
@@ -162,7 +170,7 @@ if __name__ == '__main__':
     table = pd.read_csv(fname)
     outfile = path.basename(fname).split('.')[0]
     param = params.findall(outfile)[0]
-    plot_results(outfile, table, param, kw['threshold'])
+    plot_results(outfile, table, param, kw['threshold'], savecsv=kw['save_csvs'])
     print('visualization created')
   elif kw['dir']:
     directory = kw['dir']
@@ -173,5 +181,5 @@ if __name__ == '__main__':
       outfile = path.basename(f).split('.')[0]
       param = params.findall(outfile)[0]
       print(f, param)
-      plot_results(outfile, table, param, kw['threshold'], output_dir=output_dir)
+      plot_results(outfile, table, param, kw['threshold'], output_dir=output_dir, savecsv=kw['save_csvs'])
     print('%d visualization(s) created' % len(files))
