@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def pad(im,x,y):
     '''
     pad an image for pasting
@@ -14,7 +15,15 @@ def pad(im,x,y):
         horz = (0, abs(x))
     else:
         horz = (x, 0)
-    return np.pad(im, (vert, horz), 'constant', constant_values=(0,0))
+    return zero_pad(im, vert, horz)
+
+
+def zero_pad(im, tb, rl):
+    '''
+    wrapper for zero padding
+    '''
+    return np.pad(im, (tb, rl), 'constant', constant_values=(0,0))
+
 
 def paste(canvas, paint):
     '''
@@ -66,6 +75,7 @@ def eq_paste(canvas, paint):
     output[o_mask] = paint[o_mask] # for places where output is 0: paint.
     return output
 
+
 def merge(ref, mov, x, y, zero=0):
     rx, ry = (-x,-y)
     mx, my = (x,y)
@@ -74,6 +84,7 @@ def merge(ref, mov, x, y, zero=0):
     mov = pad(mov, mx, my)
     merged = eq_paste(ref, mov)
     return crop_zeros(merged, zero=zero)
+
 
 def tuple_sub(t1, t2):
     '''
@@ -125,47 +136,49 @@ def equalize_image(image, target_size):
         image = image[:th,:]
 
     if nw + nh > 0:
-        return np.pad(image, ((0, nh), (0, nw)), 'constant', constant_values=(0,0))
+        return zero_pad(image, (0, nh), (0, nw))
     return image
+
 
 def bounds_equalize(ref, target, padded_vals=False):
     '''
     Given two images, pad them to make them the same size
+    padding keeps image in the center.
     '''
     r_pad = [0,0]
     t_pad = [0,0]
     yd,xd = tuple_sub(target.shape, ref.shape)
     if yd < 0:
-        target = np.pad(target, ((-yd//2,-yd//2), (0,0)), 'constant', constant_values=(0,0))
+        target = zero_pad(target, (-yd//2,-yd//2), (0,0))
         t_pad[1] += abs(yd)
     else:
-        ref = np.pad(ref, ((yd//2,yd//2), (0,0)), 'constant', constant_values=(0,0))
+        ref = zero_pad(ref, (yd//2,yd//2), (0,0))
         r_pad[1] += yd
 
     if xd < 0:
-        target = np.pad(target, ((0,0), (-xd//2,-xd//2)), 'constant', constant_values=(0,0))
+        target = zero_pad(target, (0,0), (-xd//2,-xd//2))
         t_pad[0] += abs(xd)
     else:
-        ref = np.pad(ref, ((0,0), (xd//2,xd//2)), 'constant', constant_values=(0,0))
+        ref = zero_pad(ref, (0,0), (xd//2,xd//2))
         r_pad[0] += xd
 
     # there can be some off-by-one errors from division, make sure they're the same size
     if target.shape != ref.shape:
         py = target.shape[0] - ref.shape[0] if target.shape[0] > ref.shape[0] else 0
         px = target.shape[1] - ref.shape[1] if target.shape[1] > ref.shape[1] else 0
-        ref = np.pad(ref, ((0,py),(0,px)), 'constant', constant_values=(0,0))
+        ref = zero_pad(ref, (0,py), (0,px))
         r_pad[0] += px
         r_pad[1] += py
 
         py = ref.shape[0] - target.shape[0] if ref.shape[0] > target.shape[0] else 0
         px = ref.shape[1] - target.shape[1] if ref.shape[1] > target.shape[1] else 0
-        target = np.pad(target, ((0,py),(0,px)), 'constant', constant_values=(0,0))
+        target = zero_pad(target, (0,py), (0,px))
         t_pad[0] += px
         t_pad[1] += py
 
     if padded_vals:
         return ref, target, (tuple(r_pad), tuple(t_pad))
-    return  ref, target
+    return ref, target
 
 
 def ul_equalize(ref, mov):
