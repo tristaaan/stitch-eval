@@ -98,7 +98,9 @@ def plot_results(fname, results, param, threshold, output_dir='.', savecsv=False
   if savecsv:
     parsed_results.to_csv(path.join(output_dir, fname + '_parsed.csv'))
   successes = parsed_results.pivot('overlap', param, 'success')
+  successes = (successes / vmax) * 100
   errors    = parsed_results.pivot('overlap', param, 'error')
+
   sns.set()
   f, ax = plt.subplots(figsize=(9, 6))
   # define the color map, red to blue, no gray point
@@ -110,18 +112,23 @@ def plot_results(fname, results, param, threshold, output_dir='.', savecsv=False
     (1, '#415DC9')
   ]
   vmax += 1
+  pmax = 101
+
+  # segmented colorbar with vmax bins
   cmap = clr.LinearSegmentedColormap.from_list('mmap', spread, N=vmax)
+
+  # plot heatmap
   sns.heatmap(successes, annot=errors, fmt='s', \
               linewidths=.5, ax=ax, annot_kws={'rotation':40}, \
               cmap=cmap, cbar_kws={'label': 'success'}, \
-              vmin=0, vmax=vmax)
+              vmin=0, vmax=pmax)
 
   # center the ticks on each segment of the color bar
   # for some reason seaborn doesn't do this automatically
   cbar = ax.collections[0].colorbar
-  tick_locs = np.arange(0,vmax,2) + 0.5
+  tick_locs = np.arange(0,pmax,25) + 0.5
   cbar.set_ticks(tick_locs)
-  cbar.set_ticklabels(np.arange(0,vmax,2))
+  cbar.set_ticklabels(list(map(lambda x: '%.0f%%' % x, np.arange(0,pmax,25))))
 
   # save fig
   plt.savefig(path.join(output_dir, ('%s.png' % fname)))
