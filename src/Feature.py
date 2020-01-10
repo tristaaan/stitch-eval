@@ -58,7 +58,8 @@ def stitch(im1, im2, matcher, get_keypoints):
     dst_pts = np.float32([kp_1[m.queryIdx].pt for m in better_matches ]).reshape(-1,1,2)
 
     # find the transformation given the amount of points
-    M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+    # M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+    M, mask = cv2.estimateAffinePartial2D(src_pts, dst_pts)
     if M is None:
         return None, None, None
     h,w = im2.shape
@@ -67,6 +68,7 @@ def stitch(im1, im2, matcher, get_keypoints):
     x_offset, y_offset = M[0:2, 2]
     new_size = (int(w*2+x_offset), int(h*2+y_offset))
     affine_M = M[:2,:3]
+
 
     # if the new size is too large report catastrophic failure
     if max(map(abs, new_size)) > max(im1.shape) * 4:
