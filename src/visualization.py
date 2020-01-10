@@ -8,6 +8,7 @@ from os import path
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as clr
+import matplotlib.lines as mlines
 import seaborn as sns
 import pandas as pd
 
@@ -17,7 +18,9 @@ def saveimfids(fname, im, fids, truthy=[]):
     plot fiducial markers on the stitched image
     '''
     fig, a = plt.subplots(1, 1, figsize=(4, 5))
+    # should be very visible colors on any image
     colors = ['r', 'tab:orange', 'c', 'm']
+
     a.imshow(im, cmap='gray')
     # offset fiducial markers for visualization
     offset_x, offset_y = (0,0)
@@ -27,20 +30,40 @@ def saveimfids(fname, im, fids, truthy=[]):
         offset_x = -1 * min_x
     if min_y < 0:
         offset_y = -1 * min_y
-    # draw them on the plot
+    lines = []
+    # draw image markers
     for i,fid in enumerate(fids):
-        # fid.transform(offset_x, offset_y, 0)
         for c in fid.corners:
             x,y = c
             x += offset_x
             y += offset_y
             a.plot(x,y, 'o', color=colors[i])
+            lines.append([x,y])
+    # draw outlines
+    ls = ':'
+    for i in range(0, len(lines), 4):
+      pts = lines[i:i+4]
+      color = colors[i // 4]
+      # draw first to last point
+      ax, ay = pts[0]
+      bx, by = pts[-1]
+      l = mlines.Line2D([ax,bx], [ay,by], color=color, ls=ls)
+      a.add_line(l)
+      # draw all other outlines
+      for j in range(len(pts[:-1])):
+        nextj = j + 1
+        ax, ay = pts[j]
+        bx, by = pts[nextj]
+        l = mlines.Line2D([ax,bx], [ay,by], color=color, ls=ls)
+        a.add_line(l)
+
+    # draw ground truth markers
     for i,fid in enumerate(truthy):
         for c in fid.corners:
             x,y = c
             x += offset_x
             y += offset_y
-            a.plot(x,y, 'o', color=colors[i], mfc='none')
+            a.plot(x,y, 'o', color=colors[i], mfc='none', mew=1)
     a.get_xaxis().set_visible(False)
     a.get_yaxis().set_visible(False)
     plt.savefig(fname)
@@ -64,8 +87,11 @@ def prepare_table(df, threshold):
     avg_err = 0
     suc = 0
     vmax = len(result)
+    min_max_err = np.inf
     for record in result.values():
       max_err = float(record['max']) / 4 # average this
+      if max_err < min_max_err:
+        min_max_err = max_err
       # if the max error is under the threshold record the error
       if max_err != 'inf' and max_err <= threshold:
         avg_err += record['err']
@@ -73,9 +99,9 @@ def prepare_table(df, threshold):
     # record average successful error
     if suc > 0:
       error.append('%0.02f' % (avg_err / suc))
-    # otherwise record -1
+    # otherwise record the minimal max-error
     else:
-      error.append('')
+      error.append('%0.02f' % min_max_err)
     success.append(suc)
   # create new df with new columns
   cols = pd.DataFrame({'error': error, 'success': success})
@@ -106,10 +132,11 @@ def plot_results(fname, results, param, threshold, output_dir='.', savecsv=False
   # define the color map, red to blue, no gray point
   # very similar to sns.color_palette("coolwarm_r", n_colors=vmax)
   spread = [
-    (0, '#BE2F33'),
-    (0.49, '#E6CEC2'),
-    (0.5, '#C7D4E8'),
-    (1, '#415DC9')
+    (0, '#bfbfbf'), # gray, no successes
+    (0.01, '#BE2F33'), # worst red
+    (0.49, '#E6CEC2'), # best red (success lt 50%)
+    (0.5, '#C7D4E8'), # worst blue (success gte 50%)
+    (1, '#415DC9') # best blue
   ]
   vmax += 1
   pmax = 101
