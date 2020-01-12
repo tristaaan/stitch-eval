@@ -85,23 +85,34 @@ def prepare_table(df, threshold):
     mstr = json_result[0].replace('\'', '"')
     result = json.loads(mstr)
     avg_err = 0
+    avg_suc_err = 0
     suc = 0
     vmax = len(result)
-    min_max_err = np.inf
+    avg_err_size = vmax
     for record in result.values():
       max_err = float(record['max']) / 4 # average this
-      if max_err < min_max_err:
-        min_max_err = max_err
       # if the max error is under the threshold record the error
+      err = float(record['err'])
       if max_err != 'inf' and max_err <= threshold:
-        avg_err += record['err']
+        avg_suc_err += err
         suc += 1
+
+      # record non-infinite error here if zero successes
+      if err != np.inf:
+        avg_err += err
+      else:
+        avg_err_size -= 1
     # record average successful error
     if suc > 0:
-      error.append('%0.02f' % (avg_err / suc))
+      error.append('%0.02f' % (avg_suc_err / suc))
     # otherwise record the minimal max-error
     else:
-      error.append('%0.02f' % min_max_err)
+      # all errors were inf
+      if avg_err_size == 0:
+        error.append('inf')
+      # record average failed error
+      else:
+        error.append('%0.02f' % (avg_err / avg_err_size))
     success.append(suc)
   # create new df with new columns
   cols = pd.DataFrame({'error': error, 'success': success})
