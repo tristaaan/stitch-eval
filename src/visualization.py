@@ -186,6 +186,7 @@ def plot_1d_results(fname, results, param, threshold, output_dir='.', savecsv=Fa
 
   fig, ax = plt.subplots()
   ax.plot(x_marks, sucs)
+  plt.grid()
   ax.set_xticks(x_marks)
   ax.set_xticklabels(names)
   plt.savefig(path.join(output_dir, ('%s.png' % fname)))
