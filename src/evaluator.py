@@ -148,6 +148,8 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
         if multi_file:
             json_record = {}
             # evaluate each image
+            print('Progress: 0/%d' % (len(inputs)), end = '\r')
+            duration_sum = 0
             for i, f in enumerate(inputs):
                 duration, err, min_err, max_err = eval_method(f, method, **kw)
                 json_record[f] = {
@@ -156,6 +158,13 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
                     'min': min_err,
                     'max': max_err
                 }
+                # print progress and estimated time remaining
+                duration_sum += duration
+                average_duration = duration_sum / (i + 1)
+                m, s = divmod((len(inputs) - (i+1)) * average_duration, 60)
+                print('progress: {}/{} ({:.1f}, {:01d}:{:02})'
+                    .format(i + 1, len(inputs), average_duration, int(m), int(s)),
+                    end = '\r')
             row.append(
                 result_row(overlap, param, val, json_record, image_size)
             )
@@ -166,17 +175,17 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
             if len(vals) == 0:
                 min_err = 'na'
                 max_err = 'na'
-                print("{}: {:0.2f}, t: {}, min_err: {}, max_err: {}"
+                print('{}: {:0.2f}, t: {}, min_err: {}, max_err: {}'
                     .format(param, val, avg_duration, min_err, max_err))
             else:
                 min_err = min(vals)
                 max_err = max(vals)
-                print("{}: {:0.2f}, t: {:0.2f}, min_err: {:0.2f}, max_err: {:0.2f}"
+                print('{}: {:0.2f}, t: {:0.2f}, min_err: {:0.2f}, max_err: {:0.2f}'
                     .format(param, val, avg_duration, min_err, max_err))
         # perform evaluations on a single image
         else:
             duration, err, min_err, max_err = eval_method(image_name, method, **kw)
-            print("{}: {:0.2f}, t: {}, err: {}".format(param, val, duration, err))
+            print('{}: {:0.2f}, t: {}, err: {}'.format(param, val, duration, err))
             record = {
                 'err': err,
                 'time': duration,
