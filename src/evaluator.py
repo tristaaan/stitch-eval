@@ -109,7 +109,7 @@ def eval_method(image_name, method, debug=False, **kwargs):
     # if debug, write the stitched image.
     if debug:
         print(transforms[0], '\n', transforms[1], '\n', transforms[2])
-        print(average_err, min_err, max_err)
+        print(average_err, min_err/4, max_err/4)
         fname = '../data/tmp/%s_%d_%.02f_%.02f.tif' % \
                 (method.__name__, int(kwargs['overlap']*100), average_err, max_err/4)
         saveimfids(fname, stitched, copy.deepcopy(est_fiducials), truthy=ground_truth)
@@ -161,15 +161,15 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
                     'min': min_err,
                     'max': max_err
                 }
-                if max_err != 'inf' and max_err <= 1:
+                if max_err != 'inf' and max_err/4 <= 1:
                     success_sum += 1
 
                 # print progress and estimated time remaining
                 duration_sum += duration
                 average_duration = duration_sum / (i + 1)
                 m, s = divmod((input_size - (i+1)) * average_duration, 60)
-                print('progress: {}/{} (t: {:.1f}, {:01d}:{:02}) (s: {:d})'
-                    .format(i + 1, input_size, average_duration, int(m), int(s), success_sum),
+                print('progress: {}/{} (t: {:.1f}, {:01d}:{:02}) (s: {:d}) (e: {:.02f})'
+                    .format(i + 1, input_size, average_duration, int(m), int(s), success_sum, err),
                     end = '\r')
             # append results to table
             row.append(

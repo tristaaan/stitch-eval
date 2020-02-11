@@ -17,7 +17,7 @@ def saveimfids(fname, im, fids, truthy=[]):
     '''
     plot fiducial markers on the stitched image
     '''
-    fig, a = plt.subplots(1, 1, figsize=(4, 5))
+    fig, a = plt.subplots(1, 1, figsize=(4, 4))
     # should be very visible colors on any image
     colors = ['r', 'tab:orange', 'c', 'm']
 
