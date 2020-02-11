@@ -130,8 +130,10 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
         print('%s: %s, overlap: %0.2f' % (method.__name__, param, data_range[0]))
 
     multi_file = type(inputs) == list
+    input_size = len(inputs)
     if not multi_file:
         image_name = inputs
+        input_size = 1
 
     if downsample != False:
         image_size = downsample
@@ -148,8 +150,9 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
         if multi_file:
             json_record = {}
             # evaluate each image
-            print('Progress: 0/%d' % (len(inputs)), end = '\r')
+            print('Progress: 0/%d' % (input_size), end = '\r')
             duration_sum = 0
+            success_sum = 0
             for i, f in enumerate(inputs):
                 duration, err, min_err, max_err = eval_method(f, method, **kw)
                 json_record[f] = {
@@ -158,30 +161,42 @@ def eval_param(inputs, method, param, data_range, overlap=0.2,
                     'min': min_err,
                     'max': max_err
                 }
+                if max_err != 'inf' and max_err <= 1:
+                    success_sum += 1
+
                 # print progress and estimated time remaining
                 duration_sum += duration
                 average_duration = duration_sum / (i + 1)
-                m, s = divmod((len(inputs) - (i+1)) * average_duration, 60)
-                print('progress: {}/{} ({:.1f}, {:01d}:{:02})'
-                    .format(i + 1, len(inputs), average_duration, int(m), int(s)),
+                m, s = divmod((input_size - (i+1)) * average_duration, 60)
+                print('progress: {}/{} (t: {:.1f}, {:01d}:{:02}) (s: {:d})'
+                    .format(i + 1, input_size, average_duration, int(m), int(s), success_sum),
                     end = '\r')
+            # append results to table
             row.append(
                 result_row(overlap, param, val, json_record, image_size)
             )
+            # end of run output
+            # calculate average duration
             avg_duration = reduce(lambda prev,cur: prev+cur['time'], json_record.values(), 0)
+            # retrieve values from records for output
             vals = list(filter(lambda val: type(val) != str,
                 map(lambda cur: cur['err'], json_record.values())
             ))
+            # all inf
             if len(vals) == 0:
-                min_err = 'na'
-                max_err = 'na'
-                print('{}: {:0.2f}, t: {}, min_err: {}, max_err: {}'
-                    .format(param, val, avg_duration, min_err, max_err))
+                min_err = np.inf
+                max_err = np.inf
+            # some inf
+            elif len(vals) < input_size:
+                min_err = min(vals)
+                max_err = np.inf
+            # no inf
             else:
                 min_err = min(vals)
                 max_err = max(vals)
-                print('{}: {:0.2f}, t: {:0.2f}, min_err: {:0.2f}, max_err: {:0.2f}'
-                    .format(param, val, avg_duration, min_err, max_err))
+            print('{}: {:0.2f}, t: {:0.2f}, s: {}/{}, min: {:0.2f}, max: {:0.2f}'
+                .format(param, val, avg_duration, success_sum, input_size,
+                    min_err, max_err))
         # perform evaluations on a single image
         else:
             duration, err, min_err, max_err = eval_method(image_name, method, **kw)
