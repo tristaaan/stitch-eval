@@ -84,7 +84,8 @@ def points_to_affine(shape, H_4pt):
                      [w, h],
                      [w, 0]], dtype='float32')
     pts2 = H_4pt + pts1
-    return cv2.findHomography(pts1, pts2)[0][:2,:3]
+    M, _ = cv2.estimateAffinePartial2D(pts1, pts2)
+    return M
 
 def warp_merge(im1, im2, h):
     '''
