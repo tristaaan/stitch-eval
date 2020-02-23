@@ -165,8 +165,10 @@ def plot_results(fname, results, param, threshold, output_dir='.', savecsv=False
   # for some reason seaborn doesn't do this automatically
   cbar = ax.collections[0].colorbar
   tick_locs = np.arange(0,pmax,25) + 0.5
+  tick_str = list(map(lambda x: '%.0f%%' % x, np.arange(0,pmax,25)))
+  tick_str[-1] = tick_str[-1] + ' (%d)' % (vmax-1)
   cbar.set_ticks(tick_locs)
-  cbar.set_ticklabels(list(map(lambda x: '%.0f%%' % x, np.arange(0,pmax,25))))
+  cbar.set_ticklabels(tick_str)
 
   # save fig
   plt.savefig(path.join(output_dir, ('%s.png' % fname)))
