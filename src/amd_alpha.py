@@ -25,7 +25,7 @@ symmetric_measure = True
 squared_measure = False
 
 # The number of iterations
-param_iterations = 200
+param_iterations = 250
 # The fraction of the points to sample randomly (0.0-1.0)
 param_sampling_fraction = 0.01
 
@@ -47,8 +47,8 @@ def stitch(ref_im, flo_im, mask_ref=False):
     mask2 = flo_im != 0
 
     # normalize
-    ref_im = filters.normalize(ref_im, 0.05, mask1)
-    flo_im = filters.normalize(flo_im, 0.05, mask2)
+    ref_im = filters.normalize(ref_im, 0.1, mask1)
+    flo_im = filters.normalize(flo_im, 0.1, mask2)
 
     # weights and masks
     weights1 = np.ones(ref_im.shape)
@@ -73,7 +73,7 @@ def stitch(ref_im, flo_im, mask_ref=False):
     reg.add_pyramid_level(1, 0.0)
 
     # Learning-rate / Step lengths [[start1, end1], [start2, end2] ...]
-    step_lengths = np.array([[1., 1.], [1.0, 0.5], [0.25, 0.1]])
+    step_lengths = np.array([[2.0, 1.0], [1.0, 0.5], [0.25, 0.05]])
 
     # Create the transform and add it to the registration framework
     reg.add_initial_transform(Rigid2DTransform(), np.array([0.05, 1.0, 1.0]))
