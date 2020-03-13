@@ -1,11 +1,13 @@
 # Comparison of Image Stitching Methods
 
-Comparison and evaluation tool for a variety of image stitching methods. These methods include:
+Evaluation tool for image stitching methods. Some methods included:
 
-- Area/spatial based
-- Frequency based
-- Feature based
-- Learning based
+- SURF, SIFT, AKAZE
+- An area based method by [Öfverstedt et al.](https://ieeexplore.ieee.org/document/8643403).
+- Frequency based method
+- Learning based methods (see [`deep-homography`](https://github.com/tristaaan/stitch-eval/tree/deep_homography) branch and notebooks within).
+
+This is the corresponding repository for the thesis project "[Implementation and Evaluation of Image Stitching Methods](http://thesixsides.com/misc/thesis.pdf)" (2020) by Tristan Wright
 
 ## Cloning
 
@@ -21,14 +23,30 @@ If you have already pulled you can update the submodule with:
 git submodule update --init
 ```
 
+## Installing
+
+With Anaconda: 
+```
+conda create --name stitch-eval --file requirements.txt
+```
+
+Separately you'll need to install `imutils` with pip: 
+
+```
+pip install imutils # not sure why anaconda cannot find this.
+```
+
+Can install these libraries with `pip` too but much easier to manage with anaconda.
+
+Libraries for machine learning methods not included as they're very system dependent. Safe to say one will need Keras and TensorFlow.
+
 ## Scripts
 
 ### `im_split.py`
 
 ```py
 $ python im_split.py -h
-usage: im_split.py [-h] [-noise NOISE] [-rotation ROTATION] [-overlap OVERLAP]
-                   [-blocks BLOCKS] [-downsample DOWNSAMPLE] [-file FILE]
+usage: im_split.py [-h] [-noise NOISE] [-rotation ROTATION] [-overlap OVERLAP] [-blocks BLOCKS] [-downsample DOWNSAMPLE] [-file FILE]
 
 Split an image into blockswith some overlap, rotation,and/or noise
 
@@ -83,16 +101,17 @@ optional arguments:
 ### `visualization.py`
 
 ```
-$ python visualization.py  -h
-usage: visualization.py [-h] (-file FILE | -dir DIR) [-o O] [-size SIZE]
+$ python visualization.py -h
+usage: visualization.py [-h] (-file FILE | -dir DIR) [-o O] [-threshold THRESHOLD] [-save_csvs]
 
 Visualize csv results
 
 optional arguments:
-  -h, --help           show this help message and exit
-  -file FILE, -f FILE  input filename
-  -dir DIR, -d DIR     input directory
-  -o O                 output directory
-  -size SIZE, -s SIZE  image size from the results to help determine the color
-                       scale
+  -h, --help            show this help message and exit
+  -file FILE, -f FILE   input csv
+  -dir DIR, -d DIR      input directory
+  -o O                  output directory
+  -threshold THRESHOLD, -t THRESHOLD
+                        error threshold
+  -save_csvs, -s        save csv's with error and success columns
 ```
